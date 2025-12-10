@@ -208,6 +208,15 @@ void AWorldChunk::GenerateMesh()
 
 					if (!WorldManager) return false;
 
+					FIntPoint NeighborChunkXY;
+					NeighborChunkXY.X = FMath::FloorToInt((float)GlobalX / ChunkSize);
+					NeighborChunkXY.Y = FMath::FloorToInt((float)GlobalY / ChunkSize);
+
+                    if (!WorldManager->IsChunkWithinRenderDistance(NeighborChunkXY))
+                    {
+                        return true;
+					}
+
 					bool Solid = WorldManager->IsVoxelSolidGlobal(GlobalX, GlobalY, GlobalZ);
 
                     if (x == 0 || x == ChunkSize - 1 || y == 0 || y == ChunkSize - 1)

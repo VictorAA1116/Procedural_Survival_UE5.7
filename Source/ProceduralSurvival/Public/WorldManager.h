@@ -28,6 +28,8 @@ public:
 	// Convert global voxel coords to chunk coords and local voxel coords
 	void GlobalVoxelToChunkCoords(int GlobalX, int GlobalY, int GlobalZ, FIntPoint& OutChunkXY, FIntVector& OutLocalXYZ) const;
 
+	bool IsChunkWithinRenderDistance(const FIntPoint& ChunkXY) const;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

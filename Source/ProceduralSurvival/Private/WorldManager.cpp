@@ -212,3 +212,10 @@ void AWorldManager::DestroyChunkAt(const FIntPoint& ChunkXY)
 	ActiveChunks.Remove(ChunkXY);
 }
 
+bool AWorldManager::IsChunkWithinRenderDistance(const FIntPoint& ChunkXY) const
+{
+	const int DX = FMath::Abs(ChunkXY.X - CenterChunk.X);
+	const int DY = FMath::Abs(ChunkXY.Y - CenterChunk.Y);
+	return (DX <= RenderDistance && DY <= RenderDistance);
+}
+
