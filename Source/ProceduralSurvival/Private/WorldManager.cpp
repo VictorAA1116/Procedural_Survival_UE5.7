@@ -179,6 +179,23 @@ void AWorldManager::SpawnChunkAt(const FIntPoint& ChunkXY)
 		ActiveChunks.Add(ChunkXY, NewChunk);
 		NewChunk->SetWorldManager(this);
 		NewChunk->InitializeChunk(ChunkSize, VoxelScale, ChunkXY);
+
+		const FIntPoint NeighborOffsets[4] = {
+			FIntPoint(-1, 0),
+			FIntPoint(1, 0),
+			FIntPoint(0, -1),
+			FIntPoint(0, 1)
+		};
+
+		for (const FIntPoint& Offset : NeighborOffsets)
+		{
+			FIntPoint NeighborXY = ChunkXY + Offset;
+			AWorldChunk** NeighborPtr = ActiveChunks.Find(NeighborXY);
+			if (NeighborPtr && *NeighborPtr)
+			{
+				(*NeighborPtr)->GenerateMesh();
+			}
+		}
 	}
 }
 

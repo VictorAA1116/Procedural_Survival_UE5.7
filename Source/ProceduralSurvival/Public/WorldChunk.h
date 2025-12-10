@@ -25,6 +25,8 @@ public:
 
 	void SetWorldManager(AWorldManager* InWorldManager) { WorldManager = InWorldManager; }
 
+    void GenerateMesh();
+
     FIntPoint GetChunkCoords() const { return ChunkCoords; }
     int GetChunkSize() const { return ChunkSize; }
 	float GetVoxelScale() const { return VoxelScale; }
@@ -46,7 +48,6 @@ private:
     TArray<FVoxel> VoxelData;
 
     void GenerateVoxels();
-    void GenerateMesh();
 
     void AddCubeFace(int FaceIndex, FVector& Position, TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs);
 
