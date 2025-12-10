@@ -113,6 +113,7 @@ void AWorldManager::UpdateChunks()
 
 	// Determine which chunks should be active
 	TSet<FIntPoint> DesiredChunks;
+	TArray<FIntPoint> ChunksToSpawn;
 
 	for (int DX = -RenderDistance; DX <= RenderDistance; ++DX)
 	{
@@ -123,13 +124,9 @@ void AWorldManager::UpdateChunks()
 
 			if (!ActiveChunks.Contains(ChunkXY))
 			{
-				//if (ActiveChunks.Num() >= MaxAllowedChunks)
-				//{
-				//	UE_LOG(LogTemp, Warning, TEXT("WorldManager: Reached MaxAllowedChunks (%d), not spawning new chunk at (%d, %d)"), MaxAllowedChunks, ChunkXY.X, ChunkXY.Y);
-				//	continue;
-				//}
+				RegisterChunkAt(ChunkXY);
 
-				SpawnChunkAt(ChunkXY);
+				ChunksToSpawn.Add(ChunkXY);
 			}
 		}
 	}
@@ -150,10 +147,28 @@ void AWorldManager::UpdateChunks()
 		DestroyChunkAt(ChunkXY);
 	}
 
+	for (const FIntPoint& ChunkXY : ChunksToSpawn)
+	{
+		AWorldChunk** ChunkPtr = ActiveChunks.Find(ChunkXY);
+		if (ChunkPtr && *ChunkPtr)
+		{
+			(*ChunkPtr)->GenerateVoxels();
+		}
+	}
+
+	for (const FIntPoint& ChunkXY : ChunksToSpawn)
+	{
+		AWorldChunk** ChunkPtr = ActiveChunks.Find(ChunkXY);
+		if (ChunkPtr && *ChunkPtr)
+		{
+			(*ChunkPtr)->GenerateMesh();
+		}
+	}
+
 	UE_LOG(LogTemp, Warning, TEXT("Active chunks: %d"), ActiveChunks.Num());
 }
 
-void AWorldManager::SpawnChunkAt(const FIntPoint& ChunkXY)
+void AWorldManager::RegisterChunkAt(const FIntPoint& ChunkXY)
 {
 	if (!GetWorld() || !ChunkClass) return;
 
@@ -179,23 +194,6 @@ void AWorldManager::SpawnChunkAt(const FIntPoint& ChunkXY)
 		ActiveChunks.Add(ChunkXY, NewChunk);
 		NewChunk->SetWorldManager(this);
 		NewChunk->InitializeChunk(ChunkSize, VoxelScale, ChunkXY);
-
-		const FIntPoint NeighborOffsets[4] = {
-			FIntPoint(-1, 0),
-			FIntPoint(1, 0),
-			FIntPoint(0, -1),
-			FIntPoint(0, 1)
-		};
-
-		for (const FIntPoint& Offset : NeighborOffsets)
-		{
-			FIntPoint NeighborXY = ChunkXY + Offset;
-			AWorldChunk** NeighborPtr = ActiveChunks.Find(NeighborXY);
-			if (NeighborPtr && *NeighborPtr)
-			{
-				(*NeighborPtr)->GenerateMesh();
-			}
-		}
 	}
 }
 

@@ -65,6 +65,6 @@ private:
 	FIntPoint CenterChunk = FIntPoint::ZeroValue;
 
 	void UpdateChunks();
-	void SpawnChunkAt(const FIntPoint& ChunkXY);
+	void RegisterChunkAt(const FIntPoint& ChunkXY);
 	void DestroyChunkAt(const FIntPoint& ChunkXY);
 };

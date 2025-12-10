@@ -24,8 +24,9 @@ void AWorldChunk::InitializeChunk(int InChunkSize, float InVoxelScale, const FIn
 	const int32 Total = ChunkSize * ChunkSize * ChunkSize;
 	VoxelData.SetNumZeroed(Total);
 
-    GenerateVoxels();
-    GenerateMesh();
+    //GenerateVoxels();
+    //GenerateMesh();
+    isInitialized = true;
 }
 
 int AWorldChunk::LocalIndex(int X, int Y, int Z) const
@@ -42,6 +43,8 @@ bool AWorldChunk::IsVoxelSolidLocal(int LocalX, int LocalY, int LocalZ) const
 {
     if (LocalX < 0 || LocalX >= ChunkSize || LocalY < 0 || LocalY >= ChunkSize || LocalZ < 0 || LocalZ >= ChunkSize) return false;
 
+    if (!isInitialized) return false;
+
 	int Index = LocalIndex(LocalX, LocalY, LocalZ);
 	if (Index < 0) return false;
 
@@ -50,6 +53,8 @@ bool AWorldChunk::IsVoxelSolidLocal(int LocalX, int LocalY, int LocalZ) const
 
 void AWorldChunk::SetVoxelLocal(int LocalX, int LocalY, int LocalZ, bool isSolid)
 {
+    if (!isInitialized) return;
+
     int Index = LocalIndex(LocalX, LocalY, LocalZ);
     if (Index < 0) return;
     VoxelData[Index].isSolid = isSolid;
@@ -59,6 +64,9 @@ void AWorldChunk::SetVoxelLocal(int LocalX, int LocalY, int LocalZ, bool isSolid
 
 void AWorldChunk::GenerateVoxels()
 {
+
+    if (!isInitialized) return;
+
     const float NoiseScale = 0.08f;
 	const float HeightMultiplier = 5.0f;
 	const float BaseHeight = ChunkSize * 0.4f;
@@ -206,6 +214,7 @@ void AWorldChunk::GenerateMesh()
                     {
                         bool LocalSolid = IsVoxelSolidLocal(x, y, z);
 
+                        /*
                         UE_LOG(LogTemp, Warning,
                             TEXT("Chunk (%d,%d) voxel (%d,%d,%d): LocalSolid=%d, NeighborSolid(%d,%d,%d)=%d"),
                             ChunkCoords.X, ChunkCoords.Y,
@@ -213,6 +222,8 @@ void AWorldChunk::GenerateMesh()
                             LocalSolid,
                             NX, NY, NZ,
                             Solid);
+                        */
+                        
                     }
 
                     return Solid;
