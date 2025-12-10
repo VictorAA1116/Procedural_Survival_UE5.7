@@ -162,6 +162,7 @@ void AWorldManager::UpdateChunks()
 		if (ChunkPtr && *ChunkPtr)
 		{
 			(*ChunkPtr)->GenerateMesh();
+			OnChunkCreated(ChunkXY);
 		}
 	}
 
@@ -217,5 +218,25 @@ bool AWorldManager::IsChunkWithinRenderDistance(const FIntPoint& ChunkXY) const
 	const int DX = FMath::Abs(ChunkXY.X - CenterChunk.X);
 	const int DY = FMath::Abs(ChunkXY.Y - CenterChunk.Y);
 	return (DX <= RenderDistance && DY <= RenderDistance);
+}
+
+void AWorldManager::OnChunkCreated(const FIntPoint& ChunkXY)
+{
+	static const FIntPoint Neighbors[4] = {
+		FIntPoint(1, 0),
+		FIntPoint(-1, 0),
+		FIntPoint(0, 1),
+		FIntPoint(0, -1)
+	};
+
+	for (const FIntPoint& Offset : Neighbors)
+	{
+		FIntPoint NeighborXY = ChunkXY + Offset;
+		AWorldChunk** NeighborPtr = ActiveChunks.Find(NeighborXY);
+		if (NeighborPtr && *NeighborPtr)
+		{
+			(*NeighborPtr)->GenerateMesh();
+		}
+	}
 }
 

@@ -244,7 +244,11 @@ void AWorldChunk::GenerateMesh()
 				if (!NeighborSolid(x, y + 1, z)) AddCubeFace(2, BasePos, Vertices, Triangles, Normals, UVs); // Front
 				if (!NeighborSolid(x, y - 1, z)) AddCubeFace(3, BasePos, Vertices, Triangles, Normals, UVs); // Back
 				if (!NeighborSolid(x, y, z + 1)) AddCubeFace(4, BasePos, Vertices, Triangles, Normals, UVs); // Top
-				if (!NeighborSolid(x, y, z - 1)) AddCubeFace(5, BasePos, Vertices, Triangles, Normals, UVs); // Bottom
+
+                if (!ShouldCullBottomFace(x, y, z))
+                {
+					if (!NeighborSolid(x, y, z - 1)) AddCubeFace(5, BasePos, Vertices, Triangles, Normals, UVs); // Bottom
+                }
             }
         }
     }
@@ -252,4 +256,10 @@ void AWorldChunk::GenerateMesh()
     //const bool bCreateCollision = false;
 
     Mesh->CreateMeshSection(0, Vertices, Triangles, Normals, UVs, {}, {}, true);
+}
+
+bool AWorldChunk::ShouldCullBottomFace(int X, int Y, int Z) const
+{
+    if (Z == 0) return true;
+    return IsVoxelSolidLocal(X, Y, Z - 1);
 }

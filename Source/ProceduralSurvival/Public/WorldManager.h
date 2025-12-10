@@ -69,4 +69,5 @@ private:
 	void UpdateChunks();
 	void RegisterChunkAt(const FIntPoint& ChunkXY);
 	void DestroyChunkAt(const FIntPoint& ChunkXY);
+	void OnChunkCreated(const FIntPoint& ChunkXY);
 };

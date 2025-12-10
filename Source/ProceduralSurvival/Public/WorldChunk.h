@@ -51,5 +51,7 @@ private:
 
     void AddCubeFace(int FaceIndex, FVector& Position, TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs);
 
+	bool ShouldCullBottomFace(int X, int Y, int Z) const;
+
     int LocalIndex(int X, int Y, int Z) const;
 };
