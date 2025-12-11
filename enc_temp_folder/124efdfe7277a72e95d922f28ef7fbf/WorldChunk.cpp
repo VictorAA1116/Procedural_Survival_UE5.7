@@ -291,7 +291,7 @@ void AWorldChunk::GenerateMarchingCubesMesh()
 		K.Y = FMath::RoundToFloat(K.Y * 100.0f) / 100.0f;
 		K.Z = FMath::RoundToFloat(K.Z * 100.0f) / 100.0f;
 
-        return FString::Printf(TEXT("%.2f_%.2f_%.2f"), K.X, K.Y, K.Z);
+        return FString::Printf(TEXT("%.4f_%.4f_%.4f"), K.X, K.Y, K.Z);
 	};
 
 	const int32 EstimatedCells = ChunkSize * ChunkSize * ChunkSize;
@@ -404,7 +404,7 @@ void AWorldChunk::GenerateMarchingCubesMesh()
 						float gx = WorldPos.X / VoxelScale;
 						float gy = WorldPos.Y / VoxelScale;
                         float gz = WorldPos.Z / VoxelScale;
-						return -ComputeGradient(gx, gy, gz);
+						return -ComputeGradient(gx, gy, gz).GetSafeNormal();
                     };
 
                     NormalAcc[i0] += ComputeSmoothNormal(v0);
@@ -463,9 +463,9 @@ float AWorldChunk::SampleDensityAtGlobalVoxel(int GlobalX, int GlobalY, int Glob
 FVector AWorldChunk::ComputeGradient(float GX, float GY, float GZ) const
 {
     const float EPS = 0.5f;
-    float DX = (float)SampleDensityAtGlobalVoxel(GX + EPS, GY, GZ) - (float)SampleDensityAtGlobalVoxel(GX - EPS, GY, GZ);
-    float DY = (float)SampleDensityAtGlobalVoxel(GX, GY + EPS, GZ) - (float)SampleDensityAtGlobalVoxel(GX, GY - EPS, GZ);
-    float DZ = (float)SampleDensityAtGlobalVoxel(GX, GY, GZ + EPS) - (float)SampleDensityAtGlobalVoxel(GX, GY, GZ - EPS);
+    float DX = SampleDensityAtGlobalVoxel(GX + EPS, GY, GZ) - SampleDensityAtGlobalVoxel(GX - EPS, GY, GZ);
+    float DY = SampleDensityAtGlobalVoxel(GX, GY + EPS, GZ) - SampleDensityAtGlobalVoxel(GX, GY - EPS, GZ);
+    float DZ = SampleDensityAtGlobalVoxel(GX, GY, GZ + EPS) - SampleDensityAtGlobalVoxel(GX, GY, GZ - EPS);
 
     return FVector(DX, DY, DZ).GetSafeNormal();
 }

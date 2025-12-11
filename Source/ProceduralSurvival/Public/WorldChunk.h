@@ -66,7 +66,7 @@ private:
 
     float SampleDensityAtGlobalVoxel(int GlobalX, int GlobalY, int GlobalZ) const;
 
-    FVector ComputeGradientAt(const AWorldChunk* Chunk, int GX, int GY, int GZ) const;
+    FVector ComputeGradient(float GX, float GY, float GZ) const;
 
     FVector VertexInterp(float IsoLevel, const FVector& P1, const FVector& P2, float ValP1, float ValP2) const;
 };
