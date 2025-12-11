@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "ProceduralMeshComponent.h"
 #include "Voxel.h"
+#include "VoxelRenderMode.h"
 #include "WorldChunk.generated.h"
 
 class UProceduralMeshComponent;
@@ -21,16 +22,18 @@ public:
 
     bool IsVoxelSolidLocal(int LocalX, int LocalY, int LocalZ) const;
 
-	void SetVoxelLocal(int LocalX, int LocalY, int LocalZ, bool isSolid);
+    void SetVoxelLocal(int LocalX, int LocalY, int LocalZ, bool isSolid);
 
-	void SetWorldManager(AWorldManager* InWorldManager) { WorldManager = InWorldManager; }
+    void SetWorldManager(AWorldManager* InWorldManager) { WorldManager = InWorldManager; }
 
     void GenerateMesh();
     void GenerateVoxels();
 
     FIntPoint GetChunkCoords() const { return ChunkCoords; }
     int GetChunkSize() const { return ChunkSize; }
-	float GetVoxelScale() const { return VoxelScale; }
+    float GetVoxelScale() const { return VoxelScale; }
+    void SetRenderMode(EVoxelRenderMode NewRenderMode) { RenderMode = NewRenderMode; }
+
     bool isInitialized = false;
 
 protected:
@@ -38,9 +41,9 @@ protected:
 
 private:
     UPROPERTY(VisibleAnywhere)
-    UProceduralMeshComponent *Mesh;
+    UProceduralMeshComponent* Mesh;
 
-	AWorldManager* WorldManager = nullptr;
+    AWorldManager* WorldManager = nullptr;
 
     FIntPoint ChunkCoords;
 
@@ -49,9 +52,21 @@ private:
 
     TArray<FVoxel> VoxelData;
 
+    UPROPERTY()
+    EVoxelRenderMode RenderMode;
+
     void AddCubeFace(int FaceIndex, FVector& Position, TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs);
 
-	bool ShouldCullBottomFace(int X, int Y, int Z) const;
+    bool ShouldCullBottomFace(int X, int Y, int Z) const;
 
     int LocalIndex(int X, int Y, int Z) const;
+
+    void GenerateCubicMesh();
+    void GenerateMarchingCubesMesh();
+
+    float SampleDensityAtGlobalVoxel(int GlobalX, int GlobalY, int GlobalZ) const;
+
+    FVector ComputeGradientAt(const AWorldChunk* Chunk, int GX, int GY, int GZ) const;
+
+    FVector VertexInterp(float IsoLevel, const FVector& P1, const FVector& P2, float ValP1, float ValP2) const;
 };

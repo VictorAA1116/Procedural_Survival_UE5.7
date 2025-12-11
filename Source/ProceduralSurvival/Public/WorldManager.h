@@ -1,18 +1,19 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "WorldChunk.h"
+#include "VoxelRenderMode.h"
 #include "GameFramework/Actor.h"
 #include "WorldManager.generated.h"
+
+
 
 UCLASS()
 class PROCEDURALSURVIVAL_API AWorldManager : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	// Sets default values for this actor's properties
 	AWorldManager();
 
@@ -63,6 +64,16 @@ private:
 	UPROPERTY()
 	APawn* PlayerPawn = nullptr;
 
+	TArray<FIntPoint> ChunkGenQueue;
+
+	UPROPERTY(EditAnywhere, Category = "World Generation")
+	float ChunkGenRate = 60.0f; // chunks per second
+
+	float ChunkGenAccumulator = 0.0f;
+
+	UPROPERTY(EditAnywhere, Category = "World Generation")
+	EVoxelRenderMode RenderMode = EVoxelRenderMode::Cubes;
+
 	// Current center chunk coordinates based on player position
 	FIntPoint CenterChunk = FIntPoint::ZeroValue;
 
@@ -70,4 +81,5 @@ private:
 	void RegisterChunkAt(const FIntPoint& ChunkXY);
 	void DestroyChunkAt(const FIntPoint& ChunkXY);
 	void OnChunkCreated(const FIntPoint& ChunkXY);
+	void SortChunkQueueByDistance();
 };
