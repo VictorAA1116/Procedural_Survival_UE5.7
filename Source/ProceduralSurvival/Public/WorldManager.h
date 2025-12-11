@@ -31,6 +31,9 @@ public:
 
 	bool IsChunkWithinRenderDistance(const FIntPoint& ChunkXY) const;
 
+	UPROPERTY(EditAnywhere, Category = "World Generation")
+	EVoxelRenderMode RenderMode = EVoxelRenderMode::Cubes;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -70,9 +73,6 @@ private:
 	float ChunkGenRate = 60.0f; // chunks per second
 
 	float ChunkGenAccumulator = 0.0f;
-
-	UPROPERTY(EditAnywhere, Category = "World Generation")
-	EVoxelRenderMode RenderMode = EVoxelRenderMode::Cubes;
 
 	// Current center chunk coordinates based on player position
 	FIntPoint CenterChunk = FIntPoint::ZeroValue;

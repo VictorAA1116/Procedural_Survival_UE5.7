@@ -79,7 +79,7 @@ void AWorldManager::Tick(float DeltaTime)
 
 			for (int32 i = 0; i < NumToProcess; ++i)
 			{
-				FIntPoint ChunkXY = ChunkGenQueue{ 0 };
+				FIntPoint ChunkXY = ChunkGenQueue[0];
 				ChunkGenQueue.RemoveAt(0);
 				AWorldChunk** ChunkPtr = ActiveChunks.Find(ChunkXY);
 
@@ -102,7 +102,7 @@ void AWorldManager::SortChunkQueueByDistance()
 
 	const float ChunkWorldSize = ChunkSize * VoxelScale;
 
-	ChunkGenQueue.Sort({ & }(const FIntPoint & A, const FIntPoint & B) {
+	ChunkGenQueue.Sort([&](const FIntPoint& A, const FIntPoint& B) {
 		FVector PosA = FVector(A.X * ChunkWorldSize, A.Y * ChunkWorldSize, 0.0f);
 		FVector PosB = FVector(B.X * ChunkWorldSize, B.Y * ChunkWorldSize, 0.0f);
 		return FVector::DistSquared(PosA, PlayerPos) < FVector::DistSquared(PosB, PlayerPos);
@@ -251,7 +251,7 @@ bool AWorldManager::IsChunkWithinRenderDistance(const FIntPoint& ChunkXY) const
 
 void AWorldManager::OnChunkCreated(const FIntPoint& ChunkXY)
 {
-	static const FIntPoint Neighbors{ 4 } = {
+	static const FIntPoint Neighbors[4] = {
 		FIntPoint(1, 0),
 		FIntPoint(-1, 0),
 		FIntPoint(0, 1),
