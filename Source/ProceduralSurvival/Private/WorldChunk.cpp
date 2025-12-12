@@ -259,7 +259,7 @@ void AWorldChunk::GenerateCubicMesh()
                 int gx = ChunkCoords.X * ChunkSizeXY + x;
                 int gy = ChunkCoords.Y * ChunkSizeXY + y;
 
-                EBiomeType Biome = WorldManager->TerrainGenerator->GetBiomeAt(gx, gy);
+                EBiomeType Biome = WorldManager->TerrainGenerator->GetDominantBiome(gx, gy);
                 FColor BiomeColor;
 
                 switch (Biome)
@@ -423,7 +423,7 @@ void AWorldChunk::GenerateMarchingCubesMesh()
 							NormalAcc.Add(FVector::ZeroVector);
 							UVs.Add(FVector2D(Vertex.X / 1000.0f, Vertex.Y / 1000.0f));
 
-                            EBiomeType Biome = WorldManager->TerrainGenerator->GetBiomeAt(gx, gy);
+                            EBiomeType Biome = WorldManager->TerrainGenerator->GetDominantBiome(gx, gy);
                             FColor BiomeColor;
 
                             switch (Biome)

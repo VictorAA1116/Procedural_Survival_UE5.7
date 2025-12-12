@@ -43,21 +43,30 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Terrain | Continents")
 	float ContinentBaseHeight = 30.0f;
 
-	UPROPERTY(EditAnywhere, Category = "Terrain | Hills")
-	float HillsFrequency = 0.01f;
+	// How wide a biome is in voxels
+	UPROPERTY(EditAnywhere, Category = "Terrain | Biomes")
+	float BiomeScale = 2000.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Terrain | Plains")
+	float PlainsFrequency = 0.006f;
+
+	UPROPERTY(EditAnywhere, Category = "Terrain | Plains")
+	float PlainsAmplitude = 15.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Terrain | Plains")
+	float PlainsBaseHeight = 10.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Terrain | Hills")
-	float HillsAmplitude = 8.0f;
+	float HillsFrequency = 0.008f;
+
+	UPROPERTY(EditAnywhere, Category = "Terrain | Hills")
+	float HillsAmplitude = 25.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Terrain | Mountains")
 	float MountainsFrequency = 0.005f;
 
 	UPROPERTY(EditAnywhere, Category = "Terrain | Mountains")
-	float MountainsAmplitude = 25.0f;
-
-	// How wide a biome is in voxels
-	UPROPERTY(EditAnywhere, Category = "Terrain | Biomes")
-	float BiomeScale = 4000.0f;
+	float MountainsAmplitude = 45.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Terrain | Rivers")
 	bool EnableRivers = false;
@@ -66,15 +75,15 @@ public:
 	float RiverFrequency = 0.002f;
 
 	UPROPERTY(EditAnywhere, Category = "Terrain | Rivers")
-	float RiverWidth = 0.05f;
+	float RiverWidth = 0.1f;
 
 	UPROPERTY(EditAnywhere, Category = "Terrain | Rivers")
-	float RiverDepth = 200.0f;
+	float RiverDepth = 15.0f;
 
 	float GetTerrainHeight(float X, float Y) const;
 	float GetDensity(float X, float Y, float Z) const;
 	FBiomeWeights GetBiomeWeights(float X, float Y) const;
-	EBiomeType GetBiomeAt(float X, float Y) const;
+	EBiomeType GetDominantBiome(float X, float Y) const;
 
 protected:
 	

@@ -19,14 +19,17 @@ FBiomeWeights UTerrainGenerator::GetBiomeWeights(float X, float Y) const
 
 	float PlainsEdge = 0.33f;
 	float MountainsEdge = 0.66f;
+	float BlendWidth = 0.1f;
 
 	FBiomeWeights Weights;
 
-	Weights.Plains = 1.0 - FMath::SmoothStep(0.25f, PlainsEdge, t);
+	Weights.Plains = 1.0f - FMath::SmoothStep(PlainsEdge - BlendWidth, PlainsEdge + BlendWidth, t);
+	Weights.Plains *= 1.1f;
 
-	Weights.Hills = FMath::SmoothStep(0.30f, PlainsEdge, t) * (1.0f - FMath::SmoothStep(MountainsEdge, 0.75f, t));
+	Weights.Mountains = FMath::SmoothStep(MountainsEdge - BlendWidth, MountainsEdge + BlendWidth, t);
 
-	Weights.Mountains = FMath::SmoothStep(MountainsEdge, 0.85f, t);
+	Weights.Hills = 1.0f - Weights.Plains - Weights.Mountains;
+	Weights.Hills = FMath::Clamp(Weights.Hills, 0.0f, 1.0f);
 
 	float sum = Weights.Plains + Weights.Hills + Weights.Mountains;
 
@@ -42,8 +45,14 @@ FBiomeWeights UTerrainGenerator::GetBiomeWeights(float X, float Y) const
 
 float UTerrainGenerator::GetPlainsHeight(int X, int Y) const
 {
-	float Height = FMath::PerlinNoise2D(FVector2D(X, Y) * 0.005f);
-	return Height * 3.0f + 20.0f;
+	float nx = X * PlainsFrequency;
+	float ny = Y * PlainsFrequency;
+
+	float n = 
+		0.7f * FMath::PerlinNoise2D(FVector2D(nx, ny)) +
+		0.2f * FMath::PerlinNoise2D(FVector2D(2 * nx, 2 * ny));
+
+	return n * PlainsAmplitude + PlainsBaseHeight;
 }
 
 float UTerrainGenerator::GetHillsHeight(int X, int Y) const
@@ -167,13 +176,15 @@ float UTerrainGenerator::GetDensity(float X, float Y, float Z) const
 	return Height - Z;
 }
 
-EBiomeType UTerrainGenerator::GetBiomeAt(float X, float Y) const
+EBiomeType UTerrainGenerator::GetDominantBiome(float X, float Y) const
 {
-	FBiomeWeights Weights = GetBiomeWeights(X, Y);
-	EBiomeType Biome1;
-	EBiomeType Biome2;
-	float Blend;
-	PickDominantBiomes(Weights, Biome1, Biome2, Blend);
-	return Biome2;
+	const FBiomeWeights Weights = GetBiomeWeights(X, Y);
+
+	EBiomeType PrimaryBiome;
+	EBiomeType SecondaryBiome;
+
+	float blend = 0.0f;
+	PickDominantBiomes(Weights, PrimaryBiome, SecondaryBiome, blend);
+	return PrimaryBiome;
 }
 
