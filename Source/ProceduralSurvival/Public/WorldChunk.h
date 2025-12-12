@@ -18,7 +18,7 @@ class PROCEDURALSURVIVAL_API AWorldChunk : public AActor
 public:
     AWorldChunk();
 
-    void InitializeChunk(int InChunkSize, float InVoxelScale, const FIntPoint& InChunkCoords);
+    void InitializeChunk(int InChunkSizeXY, int InChunkHeightZ, float InVoxelScale, const FIntPoint& InChunkCoords);
 
     bool IsVoxelSolidLocal(int LocalX, int LocalY, int LocalZ) const;
 
@@ -30,7 +30,8 @@ public:
     void GenerateVoxels();
 
     FIntPoint GetChunkCoords() const { return ChunkCoords; }
-    int GetChunkSize() const { return ChunkSize; }
+    int GetChunkSizeXY() const { return ChunkSizeXY; }
+    int GetChunkHeightZ() const { return ChunkHeightZ; }
     float GetVoxelScale() const { return VoxelScale; }
     void SetRenderMode(EVoxelRenderMode NewRenderMode) { RenderMode = NewRenderMode; }
 
@@ -47,7 +48,12 @@ private:
 
     FIntPoint ChunkCoords;
 
-    int ChunkSize = 32;
+    UPROPERTY(EditAnywhere, Category = "Chunk")
+    int32 ChunkSizeXY = 32;
+
+    UPROPERTY(EditAnywhere, Category = "Chunk")
+    int32 ChunkHeightZ = 32;
+
     float VoxelScale = 100.0f;
 
     TArray<FVoxel> VoxelData;

@@ -7,6 +7,6 @@ UENUM(BlueprintType)
 enum class EVoxelRenderMode : uint8
 {
 	Cubes	UMETA(DisplayName = "Cubes"),
-	MarchingCubes UMETA(DisplayName = "Marching Cubes"),
+	MarchingCubes UMETA(DisplayName = "Smooth"),
 	// Add other render modes as neededs
 };

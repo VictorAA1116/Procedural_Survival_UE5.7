@@ -3,10 +3,9 @@
 #include "CoreMinimal.h"
 #include "WorldChunk.h"
 #include "VoxelRenderMode.h"
+#include "TerrainGenerator.h"
 #include "GameFramework/Actor.h"
 #include "WorldManager.generated.h"
-
-
 
 UCLASS()
 class PROCEDURALSURVIVAL_API AWorldManager : public AActor
@@ -34,13 +33,20 @@ public:
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	EVoxelRenderMode RenderMode = EVoxelRenderMode::Cubes;
 
+	UPROPERTY(EditAnywhere, Instanced, Category = "Terrain")
+	UTerrainGenerator* TerrainGenerator;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	// Size of chunks in voxels (e.g., 16 means 16x16x16 voxels per chunk)
+	// Size of chunks in voxels on the X and Y axis
 	UPROPERTY(EditAnywhere, Category = "World Generation")
-	int ChunkSize = 32;
+	int ChunkSizeXY = 32;
+
+	// Height of chunks in voxels on the Z axis 
+	UPROPERTY(EditAnywhere, Category = "World Generation")
+	int ChunkHeightZ = 32;
 
 	// Size of voxel in centimeters
 	UPROPERTY(EditAnywhere, Category = "World Generation")

@@ -1,7 +1,9 @@
 #include "WorldChunk.h"
 #include "WorldManager.h"
+#include "TerrainGenerator.h"
 #include "MarchingCubeTables.h"
 #include "Engine/World.h"
+
 
 AWorldChunk::AWorldChunk()
 {
@@ -16,33 +18,33 @@ void AWorldChunk::BeginPlay()
     Super::BeginPlay();
 }
 
-void AWorldChunk::InitializeChunk(int InChunkSize, float InVoxelScale, const FIntPoint& InChunkCoords)
+void AWorldChunk::InitializeChunk(int InChunkSizeXY, int InChunkHeightZ, float InVoxelScale, const FIntPoint& InChunkCoords)
 {
-    ChunkSize = FMath::Max(1, InChunkSize);
+    ChunkSizeXY = FMath::Max(1, InChunkSizeXY);
+    ChunkHeightZ = FMath::Max(1, InChunkHeightZ);
+
     VoxelScale = InVoxelScale;
     ChunkCoords = InChunkCoords;
 
-    const int32 Total = ChunkSize * ChunkSize * ChunkSize;
+    const int32 Total = ChunkSizeXY * ChunkSizeXY * ChunkHeightZ;
     VoxelData.SetNumZeroed(Total);
 
-    //GenerateVoxels();
-    //GenerateMesh();
     isInitialized = true;
 }
 
 int AWorldChunk::LocalIndex(int X, int Y, int Z) const
 {
-    if (X < 0 || X >= ChunkSize || Y < 0 || Y >= ChunkSize || Z < 0 || Z >= ChunkSize)
+    if (X < 0 || X >= ChunkSizeXY || Y < 0 || Y >= ChunkSizeXY || Z < 0 || Z >= ChunkHeightZ)
     {
         return -1;
     }
 
-    return X + Y * ChunkSize + Z * ChunkSize * ChunkSize;
+    return X + Y * ChunkSizeXY + Z * ChunkSizeXY * ChunkSizeXY;
 }
 
 bool AWorldChunk::IsVoxelSolidLocal(int LocalX, int LocalY, int LocalZ) const
 {
-    if (LocalX < 0 || LocalX >= ChunkSize || LocalY < 0 || LocalY >= ChunkSize || LocalZ < 0 || LocalZ >= ChunkSize) return false;
+    if (LocalX < 0 || LocalX >= ChunkSizeXY || LocalY < 0 || LocalY >= ChunkSizeXY || LocalZ < 0 || LocalZ >= ChunkHeightZ) return false;
 
     if (!isInitialized) return false;
 
@@ -66,29 +68,34 @@ void AWorldChunk::SetVoxelLocal(int LocalX, int LocalY, int LocalZ, bool isSolid
 void AWorldChunk::GenerateVoxels()
 {
 
-    if (!isInitialized) return;
+    if (!isInitialized || !WorldManager || !WorldManager->TerrainGenerator) return;
 
-    const float NoiseScale = 0.08f;
-    const float HeightMultiplier = 5.0f;
-    const float BaseHeight = ChunkSize * 0.4f;
+	UTerrainGenerator* TerrainGen = WorldManager->TerrainGenerator;
 
-    for (int x = 0; x < ChunkSize; x++)
+	const int32 BaseX = ChunkCoords.X * ChunkSizeXY;
+	const int32 BaseY = ChunkCoords.Y * ChunkSizeXY;
+
+    for (int x = 0; x < ChunkSizeXY; x++)
     {
-        for (int y = 0; y < ChunkSize; y++)
+        for (int y = 0; y < ChunkSizeXY; y++)
         {
-            float ChunkX = (ChunkCoords.X * ChunkSize + x) * NoiseScale;
-            float ChunkY = (ChunkCoords.Y * ChunkSize + y) * NoiseScale;
+            const float GX = BaseX + x;
+			const float GY = BaseY + y;
 
-            float Height = FMath::PerlinNoise2D(FVector2D(ChunkX, ChunkY)) * HeightMultiplier + BaseHeight;
-
-            for (int z = 0; z < ChunkSize; z++)
+            for (int z = 0; z < ChunkHeightZ; z++)
             {
-                int Index = LocalIndex(x, y, z);
+				const float GZ = z;
+
+                int32 Index = LocalIndex(x, y, z);
                 if (Index < 0) continue;
 
                 FVoxel& Voxel = VoxelData[Index];
-                Voxel.isSolid = (z <= FMath::FloorToInt(Height));
-                Voxel.density = Voxel.isSolid ? 1.0f : -1.0f;
+
+				float Density = TerrainGen->GetDensity(GX, GY, GZ);
+
+                Voxel.density = Density;
+                Voxel.isSolid = (Density >= 0.0f);
+                
             }
         }
     }
@@ -199,18 +206,18 @@ void AWorldChunk::GenerateCubicMesh()
     TArray<FVector> Normals;
     TArray<FVector2D> UVs;
 
-    const int EstimatedFaces = ChunkSize * ChunkSize * ChunkSize;
+    const int EstimatedFaces = ChunkSizeXY * ChunkSizeXY * ChunkHeightZ;
     Vertices.Reserve(EstimatedFaces * 6 * 4);
     Triangles.Reserve(EstimatedFaces * 6 * 6);
     Normals.Reserve(EstimatedFaces * 6 * 4);
     UVs.Reserve(EstimatedFaces * 6 * 4);
 
 
-    for (int x = 0; x < ChunkSize; x++)
+    for (int x = 0; x < ChunkSizeXY; x++)
     {
-        for (int y = 0; y < ChunkSize; y++)
+        for (int y = 0; y < ChunkSizeXY; y++)
         {
-            for (int z = 0; z < ChunkSize; z++)
+            for (int z = 0; z < ChunkHeightZ; z++)
             {
                 if (!IsVoxelSolidLocal(x, y, z)) continue;
 
@@ -222,15 +229,15 @@ void AWorldChunk::GenerateCubicMesh()
 
                 auto NeighborSolid = [&](int NX, int NY, int NZ) -> bool
                 {
-                    int GlobalX = ChunkCoords.X * ChunkSize + NX;
-                    int GlobalY = ChunkCoords.Y * ChunkSize + NY;
+                    int GlobalX = ChunkCoords.X * ChunkSizeXY + NX;
+                    int GlobalY = ChunkCoords.Y * ChunkSizeXY + NY;
                     int GlobalZ = NZ;
 
                     if (!WorldManager) return false;
 
                     FIntPoint NeighborChunkXY;
-                    NeighborChunkXY.X = FMath::FloorToInt((float)GlobalX / ChunkSize);
-                    NeighborChunkXY.Y = FMath::FloorToInt((float)GlobalY / ChunkSize);
+                    NeighborChunkXY.X = FMath::FloorToInt((float)GlobalX / ChunkSizeXY);
+                    NeighborChunkXY.Y = FMath::FloorToInt((float)GlobalY / ChunkSizeXY);
 
                     if (!WorldManager->IsChunkWithinRenderDistance(NeighborChunkXY))
                     {
@@ -239,7 +246,7 @@ void AWorldChunk::GenerateCubicMesh()
 
                     bool Solid = WorldManager->IsVoxelSolidGlobal(GlobalX, GlobalY, GlobalZ);
 
-                    if (x == 0 || x == ChunkSize - 1 || y == 0 || y == ChunkSize - 1)
+                    if (x == 0 || x == ChunkSizeXY - 1 || y == 0 || y == ChunkSizeXY - 1)
                     {
                         bool LocalSolid = IsVoxelSolidLocal(x, y, z);
                     }
@@ -294,21 +301,21 @@ void AWorldChunk::GenerateMarchingCubesMesh()
         return FString::Printf(TEXT("%.2f_%.2f_%.2f"), K.X, K.Y, K.Z);
 	};
 
-	const int32 EstimatedCells = ChunkSize * ChunkSize * ChunkSize;
+	const int32 EstimatedCells = ChunkSizeXY * ChunkSizeXY * ChunkHeightZ;
     Vertices.Reserve(EstimatedCells * 2);
     Triangles.Reserve(EstimatedCells * 5);
 	Normals.Reserve(EstimatedCells * 2);
     NormalAcc.Reserve(EstimatedCells * 2);
     UVs.Reserve(EstimatedCells * 2);
 
-    for (int x = 0; x < ChunkSize; x++)
+    for (int x = 0; x < ChunkSizeXY; x++)
     {
-        for (int y = 0; y < ChunkSize; y++)
+        for (int y = 0; y < ChunkSizeXY; y++)
         {
-            for (int z = 0; z < ChunkSize; z++)
+            for (int z = 0; z < ChunkHeightZ; z++)
             {
-                int gx = ChunkCoords.X * ChunkSize + x;
-                int gy = ChunkCoords.Y * ChunkSize + y;
+                int gx = ChunkCoords.X * ChunkSizeXY + x;
+                int gy = ChunkCoords.Y * ChunkSizeXY + y;
                 int gz = z;
 
                 float val[8];
@@ -448,16 +455,7 @@ FVector AWorldChunk::VertexInterp(float IsoLevel, const FVector& P1, const FVect
 
 float AWorldChunk::SampleDensityAtGlobalVoxel(int GlobalX, int GlobalY, int GlobalZ) const
 {
-    const float NoiseScale = 0.08f;
-    const float HeightMultiplier = 5.0f;
-    const float BaseHeight = ChunkSize * 0.4f;
-
-    float SampleX = GlobalX * NoiseScale;
-    float SampleY = GlobalY * NoiseScale;
-
-    float Height = FMath::PerlinNoise2D(FVector2D(SampleX, SampleY)) * HeightMultiplier + BaseHeight;
-
-    return Height - (float)GlobalZ;
+    return WorldManager->TerrainGenerator->GetDensity(GlobalX, GlobalY, GlobalZ);
 }
 
 FVector AWorldChunk::ComputeGradient(float GX, float GY, float GZ) const

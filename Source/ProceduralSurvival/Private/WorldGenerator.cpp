@@ -22,7 +22,7 @@ void AWorldGenerator::BeginPlay()
 		return;
 	}
 
-	const float ChunkWorldSize = ChunkSize * VoxelScale;
+	const float ChunkWorldSize = ChunkSizeXY * VoxelScale;
 
 	for (int x = 0; x < WorldSizeInChunks; x++)
 	{
@@ -34,7 +34,7 @@ void AWorldGenerator::BeginPlay()
 
 			if (NewChunk)
 			{
-				NewChunk->InitializeChunk(ChunkSize, VoxelScale, FIntPoint(x, y));
+				NewChunk->InitializeChunk(ChunkSizeXY, ChunkHeightZ, VoxelScale, FIntPoint(x, y));
 			}
 		}
 	}
