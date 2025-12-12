@@ -9,8 +9,10 @@
 // Sets default values
 AWorldManager::AWorldManager()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+
+	TerrainGenerator = CreateDefaultSubobject<UTerrainGenerator>(TEXT("TerrainGenerator"));
 }
 
 // Called when the game starts or when spawned
@@ -27,7 +29,7 @@ void AWorldManager::BeginPlay()
 		SetActorHiddenInGame(true);
 		return;
 	}
-	
+
 	PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 
 	// Initialize CenterChunk based on player position
@@ -36,8 +38,8 @@ void AWorldManager::BeginPlay()
 		UE_LOG(LogTemp, Warning, TEXT("PlayerPawn start pos: %s"), *PlayerPawn->GetActorLocation().ToString());
 		FVector PlayerPos = PlayerPawn->GetActorLocation();
 		FIntVector GV = WorldPosToGlobalVoxel(PlayerPos);
-		CenterChunk.X = FMath::FloorToInt((float)GV.X / ChunkSize);
-		CenterChunk.Y = FMath::FloorToInt((float)GV.Y / ChunkSize);
+		CenterChunk.X = FMath::FloorToInt((float)GV.X / ChunkSizeXY);
+		CenterChunk.Y = FMath::FloorToInt((float)GV.Y / ChunkSizeXY);
 	}
 
 	UpdateChunks();
@@ -53,14 +55,60 @@ void AWorldManager::Tick(float DeltaTime)
 	FVector PlayerPos = PlayerPawn->GetActorLocation();
 	FIntVector GV = WorldPosToGlobalVoxel(PlayerPos);
 	FIntPoint NewCenterChunk;
-	NewCenterChunk.X = FMath::FloorToInt((float)GV.X / ChunkSize);
-	NewCenterChunk.Y = FMath::FloorToInt((float)GV.Y / ChunkSize);
+	NewCenterChunk.X = FMath::FloorToInt((float)GV.X / ChunkSizeXY);
+	NewCenterChunk.Y = FMath::FloorToInt((float)GV.Y / ChunkSizeXY);
 
 	if (NewCenterChunk != CenterChunk)
 	{
 		CenterChunk = NewCenterChunk;
 		UpdateChunks();
 	}
+
+	if (ChunkGenQueue.Num() > 0)
+	{
+
+		ChunkGenAccumulator += DeltaTime * ChunkGenRate;
+
+		int32 NumToProcess = FMath::FloorToInt(ChunkGenAccumulator);
+
+		if (NumToProcess > 0)
+		{
+			ChunkGenAccumulator -= NumToProcess;
+
+			NumToProcess = FMath::Min(NumToProcess, ChunkGenQueue.Num());
+
+			SortChunkQueueByDistance();
+
+			for (int32 i = 0; i < NumToProcess; ++i)
+			{
+				FIntPoint ChunkXY = ChunkGenQueue[0];
+				ChunkGenQueue.RemoveAt(0);
+				AWorldChunk** ChunkPtr = ActiveChunks.Find(ChunkXY);
+
+				if (ChunkPtr && *ChunkPtr)
+				{
+					(*ChunkPtr)->GenerateVoxels();
+					(*ChunkPtr)->GenerateMesh();
+					OnChunkCreated(ChunkXY);
+				}
+			}
+		}
+	}
+}
+
+void AWorldManager::SortChunkQueueByDistance()
+{
+	if (!PlayerPawn) return;
+
+	FVector PlayerPos = PlayerPawn->GetActorLocation();
+
+	const float ChunkWorldSize = ChunkSizeXY * VoxelScale;
+
+	ChunkGenQueue.Sort([&](const FIntPoint& A, const FIntPoint& B) {
+		FVector PosA = FVector(A.X * ChunkWorldSize, A.Y * ChunkWorldSize, 0.0f);
+		FVector PosB = FVector(B.X * ChunkWorldSize, B.Y * ChunkWorldSize, 0.0f);
+		return FVector::DistSquared(PosA, PlayerPos) < FVector::DistSquared(PosB, PlayerPos);
+	});
 }
 
 FIntVector AWorldManager::WorldPosToGlobalVoxel(const FVector& WorldPos) const
@@ -75,11 +123,11 @@ FIntVector AWorldManager::WorldPosToGlobalVoxel(const FVector& WorldPos) const
 
 void AWorldManager::GlobalVoxelToChunkCoords(int GlobalX, int GlobalY, int GlobalZ, FIntPoint& OutChunkXY, FIntVector& OutLocalXYZ) const
 {
-	int ChunkX = FMath::FloorToInt((float)GlobalX / ChunkSize);
-	int ChunkY = FMath::FloorToInt((float)GlobalY / ChunkSize);
+	int ChunkX = FMath::FloorToInt((float)GlobalX / ChunkSizeXY);
+	int ChunkY = FMath::FloorToInt((float)GlobalY / ChunkSizeXY);
 
-	int LocalX = GlobalX - ChunkX * ChunkSize;
-	int LocalY = GlobalY - ChunkY * ChunkSize;
+	int LocalX = GlobalX - ChunkX * ChunkSizeXY;
+	int LocalY = GlobalY - ChunkY * ChunkSizeXY;
 	int LocalZ = GlobalZ;
 
 	OutChunkXY = FIntPoint(ChunkX, ChunkY);
@@ -95,10 +143,10 @@ bool AWorldManager::IsVoxelSolidGlobal(int GlobalVoxelX, int GlobalVoxelY, int G
 	AWorldChunk* const* ChunkPtr = ActiveChunks.Find(ChunkXY);
 
 	if (!ChunkPtr || !(*ChunkPtr)) return false;
-	
+
 	const AWorldChunk* Chunk = *ChunkPtr;
 
-	if (LocalXYZ.Z < 0 || LocalXYZ.Z >= Chunk->GetChunkSize()) return false;
+	if (LocalXYZ.Z < 0 || LocalXYZ.Z >= Chunk->GetChunkHeightZ()) return false;
 
 	return Chunk->IsVoxelSolidLocal(LocalXYZ.X, LocalXYZ.Y, LocalXYZ.Z);
 }
@@ -113,6 +161,8 @@ void AWorldManager::UpdateChunks()
 
 	// Determine which chunks should be active
 	TSet<FIntPoint> DesiredChunks;
+	TArray<FIntPoint> ChunksToSpawn;
+	ChunksToSpawn.Empty();
 
 	for (int DX = -RenderDistance; DX <= RenderDistance; ++DX)
 	{
@@ -123,13 +173,9 @@ void AWorldManager::UpdateChunks()
 
 			if (!ActiveChunks.Contains(ChunkXY))
 			{
-				//if (ActiveChunks.Num() >= MaxAllowedChunks)
-				//{
-				//	UE_LOG(LogTemp, Warning, TEXT("WorldManager: Reached MaxAllowedChunks (%d), not spawning new chunk at (%d, %d)"), MaxAllowedChunks, ChunkXY.X, ChunkXY.Y);
-				//	continue;
-				//}
+				RegisterChunkAt(ChunkXY);
 
-				SpawnChunkAt(ChunkXY);
+				ChunkGenQueue.Add(ChunkXY);
 			}
 		}
 	}
@@ -153,11 +199,11 @@ void AWorldManager::UpdateChunks()
 	UE_LOG(LogTemp, Warning, TEXT("Active chunks: %d"), ActiveChunks.Num());
 }
 
-void AWorldManager::SpawnChunkAt(const FIntPoint& ChunkXY)
+void AWorldManager::RegisterChunkAt(const FIntPoint& ChunkXY)
 {
 	if (!GetWorld() || !ChunkClass) return;
 
-	float ChunkWorldSize = ChunkSize * VoxelScale;
+	float ChunkWorldSize = ChunkSizeXY * VoxelScale;
 	float WorldX = ChunkXY.X * ChunkWorldSize;
 	float WorldY = ChunkXY.Y * ChunkWorldSize;
 
@@ -165,7 +211,7 @@ void AWorldManager::SpawnChunkAt(const FIntPoint& ChunkXY)
 
 	if (!FMath::IsFinite(WorldX) || !FMath::IsFinite(WorldY) || FMath::Abs(WorldX) > 1e6f || FMath::Abs(WorldY) > 1e6f)
 	{
-		UE_LOG(LogTemp, Error, TEXT("WorldManager: Invalid spawn location for chunk at [%d,%d]"), ChunkXY.X, ChunkXY.Y);
+		UE_LOG(LogTemp, Error, TEXT("WorldManager: Invalid spawn location for chunk at {%d,%d}"), ChunkXY.X, ChunkXY.Y);
 		return;
 	}
 
@@ -174,11 +220,12 @@ void AWorldManager::SpawnChunkAt(const FIntPoint& ChunkXY)
 
 	if (NewChunk)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Spawning chunk at [%d,%d] world pos (%.1f, %.1f) - Active: %d"), ChunkXY.X, ChunkXY.Y, WorldX, WorldY, ActiveChunks.Num());
+		UE_LOG(LogTemp, Warning, TEXT("Spawning chunk at {%d,%d} world pos (%.1f, %.1f) - Active: %d"), ChunkXY.X, ChunkXY.Y, WorldX, WorldY, ActiveChunks.Num());
 
 		ActiveChunks.Add(ChunkXY, NewChunk);
 		NewChunk->SetWorldManager(this);
-		NewChunk->InitializeChunk(ChunkSize, VoxelScale, ChunkXY);
+		NewChunk->SetRenderMode(RenderMode);
+		NewChunk->InitializeChunk(ChunkSizeXY, ChunkHeightZ, VoxelScale, ChunkXY);
 	}
 }
 
@@ -197,3 +244,29 @@ void AWorldManager::DestroyChunkAt(const FIntPoint& ChunkXY)
 	ActiveChunks.Remove(ChunkXY);
 }
 
+bool AWorldManager::IsChunkWithinRenderDistance(const FIntPoint& ChunkXY) const
+{
+	const int DX = FMath::Abs(ChunkXY.X - CenterChunk.X);
+	const int DY = FMath::Abs(ChunkXY.Y - CenterChunk.Y);
+	return (DX <= RenderDistance && DY <= RenderDistance);
+}
+
+void AWorldManager::OnChunkCreated(const FIntPoint& ChunkXY)
+{
+	static const FIntPoint Neighbors[4] = {
+		FIntPoint(1, 0),
+		FIntPoint(-1, 0),
+		FIntPoint(0, 1),
+		FIntPoint(0, -1)
+	};
+
+	for (const FIntPoint& Offset : Neighbors)
+	{
+		FIntPoint NeighborXY = ChunkXY + Offset;
+		AWorldChunk** NeighborPtr = ActiveChunks.Find(NeighborXY);
+		if (NeighborPtr && *NeighborPtr)
+		{
+			(*NeighborPtr)->GenerateMesh();
+		}
+	}
+}

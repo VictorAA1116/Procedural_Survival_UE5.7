@@ -24,7 +24,10 @@ protected:
 public:
 	// Chunk size in voxels
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="World Generation")
-	int ChunkSize = 32;
+	int ChunkSizeXY = 32;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Generation")
+	int ChunkHeightZ = 32;
 
 	// World size in chunks
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="World Generation")
