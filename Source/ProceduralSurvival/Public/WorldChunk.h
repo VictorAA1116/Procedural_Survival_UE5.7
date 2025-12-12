@@ -54,6 +54,9 @@ private:
     UPROPERTY(EditAnywhere, Category = "Chunk")
     int32 ChunkHeightZ = 32;
 
+    UPROPERTY(EditAnywhere, Category = "Debug")
+    UMaterialInterface* BiomeDebugMaterial;
+
     float VoxelScale = 100.0f;
 
     TArray<FVoxel> VoxelData;
@@ -61,7 +64,7 @@ private:
     UPROPERTY()
     EVoxelRenderMode RenderMode;
 
-    void AddCubeFace(int FaceIndex, FVector& Position, TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs);
+    void AddCubeFace(int FaceIndex, FVector& Position, FColor FaceColor, TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs, TArray<FColor>& VertexColors);
 
     bool ShouldCullBottomFace(int X, int Y, int Z) const;
 

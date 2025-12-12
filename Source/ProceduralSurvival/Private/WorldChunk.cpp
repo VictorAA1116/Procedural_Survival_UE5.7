@@ -101,7 +101,7 @@ void AWorldChunk::GenerateVoxels()
     }
 }
 
-void AWorldChunk::AddCubeFace(int FaceIndex, FVector& Position, TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs)
+void AWorldChunk::AddCubeFace(int FaceIndex, FVector& Position, FColor FaceColor, TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs, TArray<FColor>& VertexColors)
 {
     float S = VoxelScale;
 
@@ -170,6 +170,7 @@ void AWorldChunk::AddCubeFace(int FaceIndex, FVector& Position, TArray<FVector>&
         Vertices.Add(Faces[FaceIndex].Verts[i]);
         Normals.Add(Faces[FaceIndex].Normal);
         UVs.Add(FVector2D((i == 1 || i == 2), (i == 2 || i == 3)));
+        VertexColors.Add(FaceColor);
     }
 
     // Add triangles
@@ -205,6 +206,7 @@ void AWorldChunk::GenerateCubicMesh()
     TArray<int32> Triangles;
     TArray<FVector> Normals;
     TArray<FVector2D> UVs;
+	TArray<FColor> VertexColors;
 
     const int EstimatedFaces = ChunkSizeXY * ChunkSizeXY * ChunkHeightZ;
     Vertices.Reserve(EstimatedFaces * 6 * 4);
@@ -254,22 +256,51 @@ void AWorldChunk::GenerateCubicMesh()
                     return Solid;
                 };
 
+                int gx = ChunkCoords.X * ChunkSizeXY + x;
+                int gy = ChunkCoords.Y * ChunkSizeXY + y;
+
+                EBiomeType Biome = WorldManager->TerrainGenerator->GetBiomeAt(gx, gy);
+                FColor BiomeColor;
+
+                switch (Biome)
+                {
+                case EBiomeType::Plains:
+                    BiomeColor = FColor::Green;
+                    break;
+                case EBiomeType::Hills:
+                    BiomeColor = FColor::Blue;
+                    break;
+                case EBiomeType::Mountains:
+                    BiomeColor = FColor::Red;
+                    break;
+                }
+
+                for (int i = 0; i < 4; ++i)
+                {
+					
+                }
+
                 // Check neighbors and add faces if neighbor is empty
-                if (!NeighborSolid(x + 1, y, z)) AddCubeFace(0, BasePos, Vertices, Triangles, Normals, UVs); // Right
-                if (!NeighborSolid(x - 1, y, z)) AddCubeFace(1, BasePos, Vertices, Triangles, Normals, UVs); // Left
-                if (!NeighborSolid(x, y + 1, z)) AddCubeFace(2, BasePos, Vertices, Triangles, Normals, UVs); // Front
-                if (!NeighborSolid(x, y - 1, z)) AddCubeFace(3, BasePos, Vertices, Triangles, Normals, UVs); // Back
-                if (!NeighborSolid(x, y, z + 1)) AddCubeFace(4, BasePos, Vertices, Triangles, Normals, UVs); // Top
+                if (!NeighborSolid(x + 1, y, z)) AddCubeFace(0, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
+                if (!NeighborSolid(x - 1, y, z)) AddCubeFace(1, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
+                if (!NeighborSolid(x, y + 1, z)) AddCubeFace(2, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Front
+                if (!NeighborSolid(x, y - 1, z)) AddCubeFace(3, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Back
+                if (!NeighborSolid(x, y, z + 1)) AddCubeFace(4, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Top
 
                 if (!ShouldCullBottomFace(x, y, z))
                 {
-                    if (!NeighborSolid(x, y, z - 1)) AddCubeFace(5, BasePos, Vertices, Triangles, Normals, UVs); // Bottom
+                    if (!NeighborSolid(x, y, z - 1)) AddCubeFace(5, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Bottom
                 }
             }
         }
     }
 
-    Mesh->CreateMeshSection(0, Vertices, Triangles, Normals, UVs, {}, {}, true);
+    Mesh->CreateMeshSection(0, Vertices, Triangles, Normals, UVs, VertexColors, {}, true);
+
+    if (BiomeDebugMaterial)
+    {
+        Mesh->SetMaterial(0, BiomeDebugMaterial);
+    }
 }
 
 void AWorldChunk::GenerateMarchingCubesMesh()
@@ -285,6 +316,7 @@ void AWorldChunk::GenerateMarchingCubesMesh()
     TArray<int32> Triangles; Triangles.Reset();
     TArray<FVector> Normals; Normals.Reset();
 	TArray<FVector2D> UVs; UVs.Reset();
+	TArray<FColor> VertexColors; VertexColors.Reset();
 
 	TMap<FString, int32> VertexIndexMap;
 	VertexIndexMap.Reserve(1024);
@@ -390,6 +422,25 @@ void AWorldChunk::GenerateMarchingCubesMesh()
                             VertexIndexMap.Add(Key, NewIndex);
 							NormalAcc.Add(FVector::ZeroVector);
 							UVs.Add(FVector2D(Vertex.X / 1000.0f, Vertex.Y / 1000.0f));
+
+                            EBiomeType Biome = WorldManager->TerrainGenerator->GetBiomeAt(gx, gy);
+                            FColor BiomeColor;
+
+                            switch (Biome)
+                            {
+                            case EBiomeType::Plains:
+                                BiomeColor = FColor::Green;
+                                break;
+                            case EBiomeType::Hills:
+                                BiomeColor = FColor::Blue;
+                                break;
+                            case EBiomeType::Mountains:
+                                BiomeColor = FColor::Red;
+                                break;
+                            }
+
+                            VertexColors.Add(BiomeColor);
+
                             return NewIndex;
                         }
 					};
@@ -438,7 +489,12 @@ void AWorldChunk::GenerateMarchingCubesMesh()
 		}
 	}
 
-    Mesh->CreateMeshSection(0, Vertices, Triangles, Normals, UVs, {}, {}, true);
+    Mesh->CreateMeshSection(0, Vertices, Triangles, Normals, UVs, VertexColors, {}, true);
+
+    if (BiomeDebugMaterial)
+    {
+		Mesh->SetMaterial(0, BiomeDebugMaterial);
+    }
 }
 
 FVector AWorldChunk::VertexInterp(float IsoLevel, const FVector& P1, const FVector& P2, float ValP1, float ValP2) const

@@ -55,14 +55,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Terrain | Mountains")
 	float MountainsAmplitude = 25.0f;
 
+	// How wide a biome is in voxels
 	UPROPERTY(EditAnywhere, Category = "Terrain | Biomes")
-	float BiomeRegionFrequency = 0.0005f;
-
-	UPROPERTY(EditAnywhere, Category = "Terrain | Biomes")
-	float BiomeFrequency = 0.0005f;
-
-	UPROPERTY(EditAnywhere, Category = "Terrain | Biomes")
-	float BiomeNoiseScale = 0.002f;
+	float BiomeScale = 4000.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Terrain | Rivers")
 	bool EnableRivers = false;
@@ -79,6 +74,7 @@ public:
 	float GetTerrainHeight(float X, float Y) const;
 	float GetDensity(float X, float Y, float Z) const;
 	FBiomeWeights GetBiomeWeights(float X, float Y) const;
+	EBiomeType GetBiomeAt(float X, float Y) const;
 
 protected:
 	
