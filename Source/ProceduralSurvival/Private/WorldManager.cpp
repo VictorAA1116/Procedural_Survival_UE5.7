@@ -142,11 +142,13 @@ bool AWorldManager::IsVoxelSolidGlobal(int GlobalVoxelX, int GlobalVoxelY, int G
 
 	AWorldChunk* const* ChunkPtr = ActiveChunks.Find(ChunkXY);
 
-	if (!ChunkPtr || !(*ChunkPtr)) return false;
+	if (!ChunkPtr || !(*ChunkPtr)) return true;
 
 	const AWorldChunk* Chunk = *ChunkPtr;
 
-	if (LocalXYZ.Z < 0 || LocalXYZ.Z >= Chunk->GetChunkHeightZ()) return false;
+	if (!Chunk->AreVoxelsGenerated()) return true;
+
+	if (LocalXYZ.Z < 0 || LocalXYZ.Z >= Chunk->GetChunkHeightZ()) return true;
 
 	return Chunk->IsVoxelSolidLocal(LocalXYZ.X, LocalXYZ.Y, LocalXYZ.Z);
 }
@@ -269,4 +271,39 @@ void AWorldManager::OnChunkCreated(const FIntPoint& ChunkXY)
 			(*NeighborPtr)->GenerateMesh();
 		}
 	}
+}
+
+bool AWorldManager::IsNeighborChunkLoaded(const FIntPoint& NChunkXY) const
+{
+	return ActiveChunks.Contains(NChunkXY);
+}
+
+bool AWorldManager::AreAllNeighborChunksVoxelReady(const FIntPoint& ChunkXY) const
+{
+	static const FIntPoint Neighbors[9] = {
+		FIntPoint(1, 0),
+		FIntPoint(-1, 0),
+		FIntPoint(0, 1),
+		FIntPoint(0, -1)
+	};
+	for (const FIntPoint& Offset : Neighbors)
+	{
+		const FIntPoint NeighborXY = ChunkXY + Offset;
+		AWorldChunk* const* NeighborPtr = ActiveChunks.Find(NeighborXY);
+		if (!NeighborPtr || !(*NeighborPtr) || !(*NeighborPtr)->AreVoxelsGenerated())
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+AWorldChunk* AWorldManager::GetChunkAt(const FIntPoint& ChunkXY) const
+{
+	AWorldChunk* const* ChunkPtr = ActiveChunks.Find(ChunkXY);
+	if (ChunkPtr)
+	{
+		return *ChunkPtr;
+	}
+	return nullptr;
 }

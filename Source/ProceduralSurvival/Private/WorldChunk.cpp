@@ -99,6 +99,8 @@ void AWorldChunk::GenerateVoxels()
             }
         }
     }
+
+	VoxelsGenerated = true;
 }
 
 void AWorldChunk::AddCubeFace(int FaceIndex, FVector& Position, FColor FaceColor, TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs, TArray<FColor>& VertexColors)
@@ -235,13 +237,23 @@ void AWorldChunk::GenerateCubicMesh()
                     int GlobalY = ChunkCoords.Y * ChunkSizeXY + NY;
                     int GlobalZ = NZ;
 
-                    if (!WorldManager) return false;
+                    if (!WorldManager) return true;
 
                     FIntPoint NeighborChunkXY;
                     NeighborChunkXY.X = FMath::FloorToInt((float)GlobalX / ChunkSizeXY);
                     NeighborChunkXY.Y = FMath::FloorToInt((float)GlobalY / ChunkSizeXY);
 
+                    if (GlobalZ < 0 || GlobalZ >= ChunkHeightZ)
+                    {
+                        return true;
+                    }
+
                     if (!WorldManager->IsChunkWithinRenderDistance(NeighborChunkXY))
+                    {
+                        return true;
+                    }
+
+                    if (!WorldManager->IsNeighborChunkLoaded(NeighborChunkXY))
                     {
                         return true;
                     }
@@ -275,11 +287,6 @@ void AWorldChunk::GenerateCubicMesh()
                     break;
                 }
 
-                for (int i = 0; i < 4; ++i)
-                {
-					
-                }
-
                 // Check neighbors and add faces if neighbor is empty
                 if (!NeighborSolid(x + 1, y, z)) AddCubeFace(0, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
                 if (!NeighborSolid(x - 1, y, z)) AddCubeFace(1, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
@@ -305,6 +312,11 @@ void AWorldChunk::GenerateCubicMesh()
 
 void AWorldChunk::GenerateMarchingCubesMesh()
 {
+    if (!WorldManager || !WorldManager->AreAllNeighborChunksVoxelReady(ChunkCoords))
+    {
+        return;
+    }
+
     const float IsoLevel = 0.0f;
 
     if (Mesh)
@@ -312,25 +324,28 @@ void AWorldChunk::GenerateMarchingCubesMesh()
         Mesh->ClearAllMeshSections();
     }
 
+    TArray<FVector> GradientCache;
+    GradientCache.SetNumZeroed(ChunkSizeXY * ChunkSizeXY * ChunkHeightZ);
+    ComputeGradient(GradientCache);
+
     TArray<FVector> Vertices; Vertices.Reset();
     TArray<int32> Triangles; Triangles.Reset();
     TArray<FVector> Normals; Normals.Reset();
 	TArray<FVector2D> UVs; UVs.Reset();
 	TArray<FColor> VertexColors; VertexColors.Reset();
 
-	TMap<FString, int32> VertexIndexMap;
+	TMap<FIntVector, int32> VertexIndexMap;
 	VertexIndexMap.Reserve(1024);
 
 	TArray<FVector> NormalAcc; NormalAcc.Reset();
 
-    auto MakeVertexKey = [&](const FVector& Vertex) -> FString
+    auto MakeVertexKey = [&](const FVector& Vertex) -> FIntVector
     {
-		FVector K = Vertex / VoxelScale;
-		K.X = FMath::RoundToFloat(K.X * 100.0f) / 100.0f;
-		K.Y = FMath::RoundToFloat(K.Y * 100.0f) / 100.0f;
-		K.Z = FMath::RoundToFloat(K.Z * 100.0f) / 100.0f;
-
-        return FString::Printf(TEXT("%.2f_%.2f_%.2f"), K.X, K.Y, K.Z);
+		return FIntVector(
+			FMath::RoundToInt(Vertex.X / VoxelScale * 100.0f),
+			FMath::RoundToInt(Vertex.Y / VoxelScale * 100.0f),
+			FMath::RoundToInt(Vertex.Z / VoxelScale * 100.0f)
+        );
 	};
 
 	const int32 EstimatedCells = ChunkSizeXY * ChunkSizeXY * ChunkHeightZ;
@@ -339,6 +354,7 @@ void AWorldChunk::GenerateMarchingCubesMesh()
 	Normals.Reserve(EstimatedCells * 2);
     NormalAcc.Reserve(EstimatedCells * 2);
     UVs.Reserve(EstimatedCells * 2);
+
 
     for (int x = 0; x < ChunkSizeXY; x++)
     {
@@ -353,14 +369,14 @@ void AWorldChunk::GenerateMarchingCubesMesh()
                 float val[8];
                 FVector pos[8];
 
-                pos[0] = FVector(gx, gy, gz) * VoxelScale - GetActorLocation();
-                pos[1] = FVector(gx + 1, gy, gz) * VoxelScale - GetActorLocation();
-                pos[2] = FVector(gx + 1, gy + 1, gz) * VoxelScale - GetActorLocation();
-                pos[3] = FVector(gx, gy + 1, gz) * VoxelScale - GetActorLocation();
-                pos[4] = FVector(gx, gy, gz + 1) * VoxelScale - GetActorLocation();
-                pos[5] = FVector(gx + 1, gy, gz + 1) * VoxelScale - GetActorLocation();
-                pos[6] = FVector(gx + 1, gy + 1, gz + 1) * VoxelScale - GetActorLocation();
-                pos[7] = FVector(gx, gy + 1, gz + 1) * VoxelScale - GetActorLocation();
+                pos[0] = FVector(x, y, z) * VoxelScale;
+                pos[1] = FVector(x + 1, y, z) * VoxelScale;
+                pos[2] = FVector(x + 1, y + 1, z) * VoxelScale;
+                pos[3] = FVector(x, y + 1, z) * VoxelScale;
+                pos[4] = FVector(x, y, z + 1) * VoxelScale;
+                pos[5] = FVector(x + 1, y, z + 1) * VoxelScale;
+                pos[6] = FVector(x + 1, y + 1, z + 1) * VoxelScale;
+                pos[7] = FVector(x, y + 1, z + 1) * VoxelScale;
 
                 val[0] = SampleDensityAtGlobalVoxel(gx, gy, gz);
                 val[1] = SampleDensityAtGlobalVoxel(gx + 1, gy, gz);
@@ -410,7 +426,7 @@ void AWorldChunk::GenerateMarchingCubesMesh()
 
                     auto GetOrCreateVertexIndex = [&](const FVector& Vertex) -> int32
                     {
-                        FString Key = MakeVertexKey(Vertex);
+                        const FIntVector Key = MakeVertexKey(Vertex);
 
                         if (VertexIndexMap.Contains(Key))
                         {
@@ -418,28 +434,20 @@ void AWorldChunk::GenerateMarchingCubesMesh()
                         }
                         else
                         {
-                            int32 NewIndex = Vertices.Add(Vertex);
+                            const int32 NewIndex = Vertices.Add(Vertex);
                             VertexIndexMap.Add(Key, NewIndex);
+
 							NormalAcc.Add(FVector::ZeroVector);
 							UVs.Add(FVector2D(Vertex.X / 1000.0f, Vertex.Y / 1000.0f));
 
-                            EBiomeType Biome = WorldManager->TerrainGenerator->GetDominantBiome(gx, gy);
-                            FColor BiomeColor;
-
-                            switch (Biome)
-                            {
-                            case EBiomeType::Plains:
-                                BiomeColor = FColor::Green;
-                                break;
-                            case EBiomeType::Hills:
-                                BiomeColor = FColor::Blue;
-                                break;
-                            case EBiomeType::Mountains:
-                                BiomeColor = FColor::Red;
-                                break;
-                            }
-
-                            VertexColors.Add(BiomeColor);
+                            const EBiomeType Biome = WorldManager->TerrainGenerator->GetDominantBiome(gx, gy);
+                            
+                            VertexColors.Add(
+                                (Biome == EBiomeType::Plains) ? FColor::Green :
+                                (Biome == EBiomeType::Hills) ? FColor::Blue :
+                                (Biome == EBiomeType::Mountains) ? FColor::Red :
+								FColor::Black
+                            );
 
                             return NewIndex;
                         }
@@ -456,18 +464,52 @@ void AWorldChunk::GenerateMarchingCubesMesh()
                     Triangles.Add(i1);
 					Triangles.Add(i2);
 
-                    auto ComputeSmoothNormal = [&](const FVector& V) -> FVector 
+                    auto SampleNormal = [&](const FVector& V) -> FVector
                     {
-                        FVector WorldPos = V + GetActorLocation();
-						float gx = WorldPos.X / VoxelScale;
-						float gy = WorldPos.Y / VoxelScale;
-                        float gz = WorldPos.Z / VoxelScale;
-						return -ComputeGradient(gx, gy, gz);
+                        const FVector World = V + GetActorLocation();
+                        const float gx = World.X / VoxelScale;
+                        const float gy = World.Y / VoxelScale;
+                        const float gz = World.Z / VoxelScale;
+
+                        // Convert to local voxel coordinates
+                        const int lx = FMath::RoundToInt(gx) - ChunkCoords.X * ChunkSizeXY;
+                        const int ly = FMath::RoundToInt(gy) - ChunkCoords.Y * ChunkSizeXY;
+                        const int lz = FMath::RoundToInt(gz);
+
+                        // Check if safely inside the chunk (can use cache)
+                        const bool bInterior =
+                            lx > 0 && lx < ChunkSizeXY - 1 &&
+                            ly > 0 && ly < ChunkSizeXY - 1 &&
+                            lz > 0 && lz < ChunkHeightZ - 1;
+
+                        if (bInterior)
+                            {
+                            const int Index = LocalIndex(lx, ly, lz);
+                            if (Index >= 0)
+                            {
+                                return -GradientCache[Index];
+                            }
+                        }
+
+                        // --- Edge fallback: sample globally to avoid seams ---
+                        const float dx =
+                            SampleDensityAtGlobalVoxel(gx + 1, gy, gz) -
+                            SampleDensityAtGlobalVoxel(gx - 1, gy, gz);
+
+                        const float dy =
+                            SampleDensityAtGlobalVoxel(gx, gy + 1, gz) -
+                            SampleDensityAtGlobalVoxel(gx, gy - 1, gz);
+
+                        const float dz =
+                            SampleDensityAtGlobalVoxel(gx, gy, gz + 1) -
+                            SampleDensityAtGlobalVoxel(gx, gy, gz - 1);
+
+                        return FVector(dx, dy, dz).GetSafeNormal();
                     };
 
-                    NormalAcc[i0] += ComputeSmoothNormal(v0);
-                    NormalAcc[i1] += ComputeSmoothNormal(v1);
-                    NormalAcc[i2] += ComputeSmoothNormal(v2);
+                    NormalAcc[i0] += SampleNormal(v0);
+                    NormalAcc[i1] += SampleNormal(v1);
+                    NormalAcc[i2] += SampleNormal(v2);
                 }
             }
         }
@@ -511,21 +553,65 @@ FVector AWorldChunk::VertexInterp(float IsoLevel, const FVector& P1, const FVect
 
 float AWorldChunk::SampleDensityAtGlobalVoxel(int GlobalX, int GlobalY, int GlobalZ) const
 {
-    return WorldManager->TerrainGenerator->GetDensity(GlobalX, GlobalY, GlobalZ);
+    if (!WorldManager || !WorldManager->TerrainGenerator)
+    {
+        return 1.0f;
+	}
+
+	FIntPoint ChunkXY;
+    FIntVector LocalXYZ;
+	WorldManager->GlobalVoxelToChunkCoords(GlobalX, GlobalY, GlobalZ, ChunkXY, LocalXYZ);
+
+	AWorldChunk* Neighbor = WorldManager->GetChunkAt(ChunkXY);
+    if (!Neighbor || !Neighbor->AreVoxelsGenerated())
+    {
+        return 1.0f;
+    }
+
+    if (!WorldManager->IsChunkWithinRenderDistance(ChunkXY) || !WorldManager->IsNeighborChunkLoaded(ChunkXY) || LocalXYZ.Z < 0 || LocalXYZ.Z >= ChunkHeightZ)
+    {
+        return 1.0f;
+	}
+
+    return Neighbor->GetVoxelDensity(LocalXYZ);
 }
 
-FVector AWorldChunk::ComputeGradient(float GX, float GY, float GZ) const
+void AWorldChunk::ComputeGradient(TArray<FVector>& GradientCache)
 {
     const float EPS = 0.5f;
-    float DX = (float)SampleDensityAtGlobalVoxel(GX + EPS, GY, GZ) - (float)SampleDensityAtGlobalVoxel(GX - EPS, GY, GZ);
-    float DY = (float)SampleDensityAtGlobalVoxel(GX, GY + EPS, GZ) - (float)SampleDensityAtGlobalVoxel(GX, GY - EPS, GZ);
-    float DZ = (float)SampleDensityAtGlobalVoxel(GX, GY, GZ + EPS) - (float)SampleDensityAtGlobalVoxel(GX, GY, GZ - EPS);
 
-    return FVector(DX, DY, DZ).GetSafeNormal();
+    for (int x = 0; x < ChunkSizeXY; x++)
+    {
+        for (int y = 0; y < ChunkSizeXY; y++)
+        {
+            for (int z = 0; z < ChunkHeightZ; z++)
+            {
+                int GX = ChunkCoords.X * ChunkSizeXY + x;
+                int GY = ChunkCoords.Y * ChunkSizeXY + y;
+                int GZ = z;
+                
+
+                const float DX = (float)SampleDensityAtGlobalVoxel(GX + EPS, GY, GZ) - (float)SampleDensityAtGlobalVoxel(GX - EPS, GY, GZ);
+                const float DY = (float)SampleDensityAtGlobalVoxel(GX, GY + EPS, GZ) - (float)SampleDensityAtGlobalVoxel(GX, GY - EPS, GZ);
+                const float DZ = (float)SampleDensityAtGlobalVoxel(GX, GY, GZ + EPS) - (float)SampleDensityAtGlobalVoxel(GX, GY, GZ - EPS);
+
+				GradientCache[LocalIndex(x, y, z)] = FVector(DX, DY, DZ).GetSafeNormal();
+            }
+        }
+	}
 }
 
 bool AWorldChunk::ShouldCullBottomFace(int X, int Y, int Z) const
 {
     if (Z == 0) return true;
     return IsVoxelSolidLocal(X, Y, Z - 1);
+}
+
+float AWorldChunk::GetVoxelDensity(const FIntVector& LocalXYZ) const
+{
+    if (!isInitialized) return 1.0f;
+
+    int Index = LocalIndex(LocalXYZ.X, LocalXYZ.Y, LocalXYZ.Z);
+    if (Index < 0) return 1.0f;
+    return VoxelData[Index].density;
 }

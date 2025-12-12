@@ -34,8 +34,11 @@ public:
     int GetChunkHeightZ() const { return ChunkHeightZ; }
     float GetVoxelScale() const { return VoxelScale; }
     void SetRenderMode(EVoxelRenderMode NewRenderMode) { RenderMode = NewRenderMode; }
+	bool AreVoxelsGenerated() const { return VoxelsGenerated; }
+	float GetVoxelDensity(const FIntVector& LocalXYZ) const;
 
     bool isInitialized = false;
+	
 
 protected:
     virtual void BeginPlay() override;
@@ -75,7 +78,9 @@ private:
 
     float SampleDensityAtGlobalVoxel(int GlobalX, int GlobalY, int GlobalZ) const;
 
-    FVector ComputeGradient(float GX, float GY, float GZ) const;
+    bool VoxelsGenerated = false;
+
+    void ComputeGradient(TArray<FVector>& GradientCache);
 
     FVector VertexInterp(float IsoLevel, const FVector& P1, const FVector& P2, float ValP1, float ValP2) const;
 };

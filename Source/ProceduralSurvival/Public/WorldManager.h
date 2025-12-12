@@ -30,6 +30,12 @@ public:
 
 	bool IsChunkWithinRenderDistance(const FIntPoint& ChunkXY) const;
 
+	bool IsNeighborChunkLoaded(const FIntPoint& NChunkXY) const;
+
+	bool AreAllNeighborChunksVoxelReady(const FIntPoint& ChunkXY) const;
+
+	AWorldChunk* GetChunkAt(const FIntPoint& ChunkXY) const;
+
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	EVoxelRenderMode RenderMode = EVoxelRenderMode::Cubes;
 
