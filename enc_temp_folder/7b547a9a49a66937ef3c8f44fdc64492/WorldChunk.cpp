@@ -288,15 +288,15 @@ void AWorldChunk::GenerateCubicMesh()
                 }
 
                 // Check neighbors and add faces if neighbor is empty
-                if (!NeighborSolid(x + 1, y, z)) AddCubeFace(0, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
-                if (!NeighborSolid(x - 1, y, z)) AddCubeFace(1, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
-                if (!NeighborSolid(x, y + 1, z)) AddCubeFace(2, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Front
-                if (!NeighborSolid(x, y - 1, z)) AddCubeFace(3, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Back
-                if (!NeighborSolid(x, y, z + 1)) AddCubeFace(4, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Top
+                if (!SampleDensityForCubic(x + 1, y, z)) AddCubeFace(0, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
+                if (!SampleDensityForCubic(x - 1, y, z)) AddCubeFace(1, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
+                if (!SampleDensityForCubic(x, y + 1, z)) AddCubeFace(2, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Front
+                if (!SampleDensityForCubic(x, y - 1, z)) AddCubeFace(3, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Back
+                if (!SampleDensityForCubic(x, y, z + 1)) AddCubeFace(4, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Top
 
                 if (!ShouldCullBottomFace(x, y, z))
                 {
-                    if (!NeighborSolid(x, y, z - 1)) AddCubeFace(5, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Bottom
+                    if (!SampleDensityForCubic(x, y, z - 1)) AddCubeFace(5, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Bottom
                 }
             }
         }
@@ -552,6 +552,33 @@ FVector AWorldChunk::VertexInterp(float IsoLevel, const FVector& P1, const FVect
     float Mu = (IsoLevel - ValP1) / (ValP2 - ValP1);
 	Mu = FMath::Clamp(Mu, 0.0f, 1.0f);
     return P1 + Mu * (P2 - P1);
+}
+
+float AWorldChunk::SampleDensityForCubic(int GlobalX, int GlobalY, int GlobalZ) const
+{
+    if (!WorldManager || !WorldManager->TerrainGenerator)
+    {
+        return 1.0f;
+	}
+
+	FIntPoint ChunkXY;
+    FIntVector LocalXYZ;
+	WorldManager->GlobalVoxelToChunkCoords(GlobalX, GlobalY, GlobalZ, ChunkXY, LocalXYZ);
+
+	AWorldChunk* Neighbor = WorldManager->GetChunkAt(ChunkXY);
+    if (!Neighbor || !Neighbor->AreVoxelsGenerated())
+    {
+        return 1.0f;
+    }
+
+    if (!WorldManager->IsChunkWithinRenderDistance(ChunkXY) || !WorldManager->IsNeighborChunkLoaded(ChunkXY) || LocalXYZ.Z < 0)
+    {
+        return 1.0f;
+	}
+
+    if (LocalXYZ.Z >= ChunkHeightZ) return -1.0f;
+
+    return Neighbor->GetVoxelDensity(LocalXYZ);
 }
 
 float AWorldChunk::SampleDensityForMarching(int GlobalX, int GlobalY, int GlobalZ) const

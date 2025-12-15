@@ -76,6 +76,7 @@ private:
     void GenerateCubicMesh();
     void GenerateMarchingCubesMesh();
 
+    float SampleDensityForCubic(int GlobalX, int GlobalY, int GlobalZ) const;
     float SampleDensityForMarching(int GlobalX, int GlobalY, int GlobalZ) const;
 
     bool VoxelsGenerated = false;

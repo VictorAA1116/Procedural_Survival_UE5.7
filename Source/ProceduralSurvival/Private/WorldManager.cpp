@@ -280,7 +280,7 @@ bool AWorldManager::IsNeighborChunkLoaded(const FIntPoint& NChunkXY) const
 
 bool AWorldManager::AreAllNeighborChunksVoxelReady(const FIntPoint& ChunkXY) const
 {
-	static const FIntPoint Neighbors[9] = {
+	static const FIntPoint Neighbors[4] = {
 		FIntPoint(1, 0),
 		FIntPoint(-1, 0),
 		FIntPoint(0, 1),
