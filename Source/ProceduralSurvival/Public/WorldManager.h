@@ -36,9 +36,14 @@ public:
 
 	AWorldChunk* GetChunkAt(const FIntPoint& ChunkXY) const;
 
+	int32 ComputeLODForChunk(const FIntPoint& ChunkXY) const;
+
+	// Voxel rendering mode (Cubes or Marching Cubes)
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	EVoxelRenderMode RenderMode = EVoxelRenderMode::Cubes;
 
+
+	// Terrain generator instance reference
 	UPROPERTY(EditAnywhere, Instanced, Category = "Terrain")
 	UTerrainGenerator* TerrainGenerator;
 
@@ -68,6 +73,7 @@ protected:
 
 private:
 
+	// Maximum allowed active chunks before unloading the farthest ones
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	int MaxAllowedChunks = 200;
 
@@ -81,10 +87,23 @@ private:
 
 	TArray<FIntPoint> ChunkGenQueue;
 
+	// Chunk generation rate in chunks per second (60 = 1 chunk per frame at 60 FPS)
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	float ChunkGenRate = 60.0f; // chunks per second
 
 	float ChunkGenAccumulator = 0.0f;
+
+	// Maximum LOD level (0 = highest detail, no LODs and lower performance)
+	UPROPERTY(EditAnywhere, Category = "LOD")
+	int32 MaxLODLevel = 4;
+
+	// Render distance for LOD0 (highest detail) in chunks
+	UPROPERTY(EditAnywhere, Category = "LOD")
+	int32 LOD0RenderDistance = 6;
+
+	// Multiplier for LOD distances (e.g., 2 means each higher LOD has double the distance of the previous)
+	UPROPERTY(EditAnywhere, Category = "LOD")
+	int32 LODStepMultiplier = 2;
 
 	// Current center chunk coordinates based on player position
 	FIntPoint CenterChunk = FIntPoint::ZeroValue;

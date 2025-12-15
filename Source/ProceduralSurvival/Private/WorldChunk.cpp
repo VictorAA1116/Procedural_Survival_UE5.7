@@ -62,7 +62,7 @@ void AWorldChunk::SetVoxelLocal(int LocalX, int LocalY, int LocalZ, bool isSolid
     if (Index < 0) return;
     VoxelData[Index].isSolid = isSolid;
 
-    GenerateMesh();
+    GenerateMeshLOD(WorldManager->ComputeLODForChunk(ChunkCoords));
 }
 
 void AWorldChunk::GenerateVoxels()
@@ -103,9 +103,9 @@ void AWorldChunk::GenerateVoxels()
 	VoxelsGenerated = true;
 }
 
-void AWorldChunk::AddCubeFace(int FaceIndex, FVector& Position, FColor FaceColor, TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs, TArray<FColor>& VertexColors)
+void AWorldChunk::AddCubeFace(int FaceIndex, FVector& Position, float CubeSize, FColor FaceColor, TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs, TArray<FColor>& VertexColors)
 {
-    float S = VoxelScale;
+    float S = CubeSize;
 
     struct FCubeFace
     {
@@ -185,18 +185,6 @@ void AWorldChunk::AddCubeFace(int FaceIndex, FVector& Position, FColor FaceColor
     Triangles.Add(Start + 3);
 }
 
-void AWorldChunk::GenerateMesh()
-{
-    if (RenderMode == EVoxelRenderMode::Cubes)
-    {
-        GenerateCubicMesh();
-    }
-    else if (RenderMode == EVoxelRenderMode::MarchingCubes)
-    {
-        GenerateMarchingCubesMesh();
-    }
-}
-
 void AWorldChunk::GenerateCubicMesh()
 {
     if (Mesh)
@@ -216,14 +204,21 @@ void AWorldChunk::GenerateCubicMesh()
     Normals.Reserve(EstimatedFaces * 6 * 4);
     UVs.Reserve(EstimatedFaces * 6 * 4);
 
+    const int Step = CurrentLODStep;
+	const int ScaledVoxel = VoxelScale * Step;
 
-    for (int x = 0; x < ChunkSizeXY; x++)
+    for (int x = 0; x < ChunkSizeXY; x += Step)
     {
-        for (int y = 0; y < ChunkSizeXY; y++)
+        for (int y = 0; y < ChunkSizeXY; y += Step)
         {
-            for (int z = 0; z < ChunkHeightZ; z++)
+            for (int z = 0; z < ChunkHeightZ; z += Step)
             {
-                if (!IsVoxelSolidLocal(x, y, z)) continue;
+				const int gx = ChunkCoords.X * ChunkSizeXY + x;
+				const int gy = ChunkCoords.Y * ChunkSizeXY + y;
+
+				const float Density = (CurrentLODLevel == 0 && AreVoxelsGenerated())? GetVoxelDensity({x, y, z}) : WorldManager->TerrainGenerator->GetDensity(gx, gy, z);
+
+				if (Density < 0.0f) continue; // Empty space
 
                 FVector BasePos = FVector(
                     x * VoxelScale,
@@ -268,9 +263,6 @@ void AWorldChunk::GenerateCubicMesh()
                     return Solid;
                 };
 
-                int gx = ChunkCoords.X * ChunkSizeXY + x;
-                int gy = ChunkCoords.Y * ChunkSizeXY + y;
-
                 EBiomeType Biome = WorldManager->TerrainGenerator->GetDominantBiome(gx, gy);
                 FColor BiomeColor;
 
@@ -288,15 +280,15 @@ void AWorldChunk::GenerateCubicMesh()
                 }
 
                 // Check neighbors and add faces if neighbor is empty
-                if (!NeighborSolid(x + 1, y, z)) AddCubeFace(0, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
-                if (!NeighborSolid(x - 1, y, z)) AddCubeFace(1, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
-                if (!NeighborSolid(x, y + 1, z)) AddCubeFace(2, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Front
-                if (!NeighborSolid(x, y - 1, z)) AddCubeFace(3, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Back
-                if (!NeighborSolid(x, y, z + 1)) AddCubeFace(4, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Top
+                if (!NeighborSolid(x + 1, y, z)) AddCubeFace(0, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
+                if (!NeighborSolid(x - 1, y, z)) AddCubeFace(1, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
+                if (!NeighborSolid(x, y + 1, z)) AddCubeFace(2, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Front
+                if (!NeighborSolid(x, y - 1, z)) AddCubeFace(3, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Back
+                if (!NeighborSolid(x, y, z + 1)) AddCubeFace(4, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Top
 
                 if (!ShouldCullBottomFace(x, y, z))
                 {
-                    if (!NeighborSolid(x, y, z - 1)) AddCubeFace(5, BasePos, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Bottom
+                    if (!NeighborSolid(x, y, z - 1)) AddCubeFace(5, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Bottom
                 }
             }
         }
@@ -357,12 +349,13 @@ void AWorldChunk::GenerateMarchingCubesMesh()
     NormalAcc.Reserve(EstimatedCells * 2);
     UVs.Reserve(EstimatedCells * 2);
 
+    const int Step = CurrentLODStep;
 
-    for (int x = 0; x < ChunkSizeXY; x++)
+    for (int x = 0; x < ChunkSizeXY; x += Step)
     {
-        for (int y = 0; y < ChunkSizeXY; y++)
+        for (int y = 0; y < ChunkSizeXY; y += Step)
         {
-            for (int z = 0; z < ChunkHeightZ; z++)
+            for (int z = 0; z < ChunkHeightZ; z += Step)
             {
                 int gx = ChunkCoords.X * ChunkSizeXY + x;
                 int gy = ChunkCoords.Y * ChunkSizeXY + y;
@@ -372,22 +365,22 @@ void AWorldChunk::GenerateMarchingCubesMesh()
                 FVector pos[8];
 
                 pos[0] = FVector(x, y, z) * VoxelScale;
-                pos[1] = FVector(x + 1, y, z) * VoxelScale;
-                pos[2] = FVector(x + 1, y + 1, z) * VoxelScale;
-                pos[3] = FVector(x, y + 1, z) * VoxelScale;
-                pos[4] = FVector(x, y, z + 1) * VoxelScale;
-                pos[5] = FVector(x + 1, y, z + 1) * VoxelScale;
-                pos[6] = FVector(x + 1, y + 1, z + 1) * VoxelScale;
-                pos[7] = FVector(x, y + 1, z + 1) * VoxelScale;
+                pos[1] = FVector(x + Step, y, z) * VoxelScale;
+                pos[2] = FVector(x + Step, y + Step, z) * VoxelScale;
+                pos[3] = FVector(x, y + Step, z) * VoxelScale;
+                pos[4] = FVector(x, y, z + Step) * VoxelScale;
+                pos[5] = FVector(x + Step, y, z + Step) * VoxelScale;
+                pos[6] = FVector(x + Step, y + Step, z + Step) * VoxelScale;
+                pos[7] = FVector(x, y + Step, z + Step) * VoxelScale;
 
                 val[0] = SampleDensityForMarching(gx, gy, gz);
-                val[1] = SampleDensityForMarching(gx + 1, gy, gz);
-                val[2] = SampleDensityForMarching(gx + 1, gy + 1, gz);
-                val[3] = SampleDensityForMarching(gx, gy + 1, gz);
-                val[4] = SampleDensityForMarching(gx, gy, gz + 1);
-                val[5] = SampleDensityForMarching(gx + 1, gy, gz + 1);
-                val[6] = SampleDensityForMarching(gx + 1, gy + 1, gz + 1);
-                val[7] = SampleDensityForMarching(gx, gy + 1, gz + 1);
+                val[1] = SampleDensityForMarching(gx + Step, gy, gz);
+                val[2] = SampleDensityForMarching(gx + Step, gy + Step, gz);
+                val[3] = SampleDensityForMarching(gx, gy + Step, gz);
+                val[4] = SampleDensityForMarching(gx, gy, gz + Step);
+                val[5] = SampleDensityForMarching(gx + Step, gy, gz + Step);
+                val[6] = SampleDensityForMarching(gx + Step, gy + Step, gz + Step);
+                val[7] = SampleDensityForMarching(gx, gy + Step, gz + Step);
 
                 int cubeIndex = 0;
 
@@ -618,4 +611,22 @@ float AWorldChunk::GetVoxelDensity(const FIntVector& LocalXYZ) const
     if (Index < 0) return -1.0f;
 
     return VoxelData[Index].density;
+}
+
+void AWorldChunk::GenerateMeshLOD(int32 LODLevel)
+{
+	CurrentLODLevel = LODLevel;
+
+	isFinalMesh = (LODLevel == 0);
+
+	CurrentLODStep = 1 << LODLevel;
+
+    if (RenderMode == EVoxelRenderMode::Cubes)
+    {
+        GenerateCubicMesh();
+    }
+    else if (RenderMode == EVoxelRenderMode::MarchingCubes)
+    {
+        GenerateMarchingCubesMesh();
+	}
 }

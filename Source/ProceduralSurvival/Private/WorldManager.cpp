@@ -88,7 +88,12 @@ void AWorldManager::Tick(float DeltaTime)
 				if (ChunkPtr && *ChunkPtr)
 				{
 					(*ChunkPtr)->GenerateVoxels();
-					(*ChunkPtr)->GenerateMesh();
+					
+					if ((*ChunkPtr)->GetCurrentLODLevel() == 0)
+					{
+						(*ChunkPtr)->GenerateMeshLOD(0);
+					}
+
 					OnChunkCreated(ChunkXY);
 				}
 			}
@@ -228,6 +233,8 @@ void AWorldManager::RegisterChunkAt(const FIntPoint& ChunkXY)
 		NewChunk->SetWorldManager(this);
 		NewChunk->SetRenderMode(RenderMode);
 		NewChunk->InitializeChunk(ChunkSizeXY, ChunkHeightZ, VoxelScale, ChunkXY);
+		const int32 LOD = ComputeLODForChunk(ChunkXY);
+		NewChunk->GenerateMeshLOD(LOD);
 	}
 }
 
@@ -268,7 +275,10 @@ void AWorldManager::OnChunkCreated(const FIntPoint& ChunkXY)
 		AWorldChunk** NeighborPtr = ActiveChunks.Find(NeighborXY);
 		if (NeighborPtr && *NeighborPtr)
 		{
-			(*NeighborPtr)->GenerateMesh();
+			if ((*NeighborPtr)->GetCurrentLODLevel() == 0 && (*NeighborPtr)->AreVoxelsGenerated())
+			{
+				(*NeighborPtr)->GenerateMeshLOD(0);
+			}
 		}
 	}
 }
@@ -306,4 +316,22 @@ AWorldChunk* AWorldManager::GetChunkAt(const FIntPoint& ChunkXY) const
 		return *ChunkPtr;
 	}
 	return nullptr;
+}
+
+int32 AWorldManager::ComputeLODForChunk(const FIntPoint& ChunkXY) const
+{
+	const FIntPoint Center = CenterChunk;
+
+	const int32 Dist = FMath::Max(FMath::Abs(ChunkXY.X - Center.X), FMath::Abs(ChunkXY.Y - Center.Y));
+
+	int32 LOD = 0;
+	int32 Threshold = LOD0RenderDistance;
+
+	while (Dist > Threshold && LOD < MaxLODLevel)
+	{
+		Threshold *= LODStepMultiplier;
+		LOD++;
+	}
+
+	return FMath::Clamp(LOD, 0, MaxLODLevel);
 }

@@ -26,8 +26,9 @@ public:
 
     void SetWorldManager(AWorldManager* InWorldManager) { WorldManager = InWorldManager; }
 
-    void GenerateMesh();
     void GenerateVoxels();
+
+	void GenerateMeshLOD(int32 LODLevel);
 
     FIntPoint GetChunkCoords() const { return ChunkCoords; }
     int GetChunkSizeXY() const { return ChunkSizeXY; }
@@ -36,6 +37,7 @@ public:
     void SetRenderMode(EVoxelRenderMode NewRenderMode) { RenderMode = NewRenderMode; }
 	bool AreVoxelsGenerated() const { return VoxelsGenerated; }
 	float GetVoxelDensity(const FIntVector& LocalXYZ) const;
+	int GetCurrentLODLevel() const { return CurrentLODLevel; }
 
     bool isInitialized = false;
 	
@@ -51,23 +53,38 @@ private:
 
     FIntPoint ChunkCoords;
 
+	// Size of chunk in voxels along X and Y axis (Horizontal plane)
     UPROPERTY(EditAnywhere, Category = "Chunk")
     int32 ChunkSizeXY = 32;
 
+	// Height of chunk in voxels along Z axis
     UPROPERTY(EditAnywhere, Category = "Chunk")
     int32 ChunkHeightZ = 32;
 
     UPROPERTY(EditAnywhere, Category = "Debug")
     UMaterialInterface* BiomeDebugMaterial;
 
+	// Current LOD level of this chunk (-1 means not set)
+    UPROPERTY()
+	int32 CurrentLODLevel = -1;
+
+	// Current LOD step for progressive LOD generation
+    UPROPERTY()
+    int32 CurrentLODStep = 0;
+
+    UPROPERTY()
+    bool isFinalMesh = false;
+
+	// Size of each voxel in Unreal units (100 units = 1 meter)
     float VoxelScale = 100.0f;
 
     TArray<FVoxel> VoxelData;
 
+	// Rendering mode for this chunk
     UPROPERTY()
     EVoxelRenderMode RenderMode;
 
-    void AddCubeFace(int FaceIndex, FVector& Position, FColor FaceColor, TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs, TArray<FColor>& VertexColors);
+    void AddCubeFace(int FaceIndex, FVector& Position, float CubeSize, FColor FaceColor, TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals, TArray<FVector2D>& UVs, TArray<FColor>& VertexColors);
 
     bool ShouldCullBottomFace(int X, int Y, int Z) const;
 
