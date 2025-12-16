@@ -64,6 +64,24 @@ void AWorldManager::Tick(float DeltaTime)
 		UpdateChunks();
 	}
 
+	for (auto& Pair : ActiveChunks)
+	{
+		AWorldChunk* Chunk = Pair.Value;
+		if (!Chunk) continue;
+
+		const int32 DesiredLOD = ComputeLODForChunk(Pair.Key);
+
+		if (DesiredLOD != Chunk->GetCurrentLODLevel())
+		{
+			Chunk->SetCurrentLODLevel(DesiredLOD);
+			if (!Chunk->isQueuedForVoxelGen)
+			{
+				Chunk->isQueuedForVoxelGen = true;
+				ChunkGenQueue.Add(Pair.Key);
+			}
+		}
+	}
+
 	if (ChunkGenQueue.Num() > 0)
 	{
 
@@ -88,13 +106,18 @@ void AWorldManager::Tick(float DeltaTime)
 				if (ChunkPtr && *ChunkPtr)
 				{
 					(*ChunkPtr)->GenerateVoxels();
+					(*ChunkPtr)->isQueuedForVoxelGen = false;
 					
 					if ((*ChunkPtr)->GetCurrentLODLevel() == 0)
 					{
 						(*ChunkPtr)->GenerateMeshLOD(0);
+						OnChunkCreated(ChunkXY);
 					}
-
-					OnChunkCreated(ChunkXY);
+					else
+					{
+						int DesiredLOD = ComputeLODForChunk(ChunkXY);
+						(*ChunkPtr)->GenerateMeshLOD(DesiredLOD);
+					}
 				}
 			}
 		}
@@ -233,8 +256,8 @@ void AWorldManager::RegisterChunkAt(const FIntPoint& ChunkXY)
 		NewChunk->SetWorldManager(this);
 		NewChunk->SetRenderMode(RenderMode);
 		NewChunk->InitializeChunk(ChunkSizeXY, ChunkHeightZ, VoxelScale, ChunkXY);
-		const int32 LOD = ComputeLODForChunk(ChunkXY);
-		NewChunk->GenerateMeshLOD(LOD);
+		NewChunk->isQueuedForVoxelGen = true;
+		ChunkGenQueue.Add(ChunkXY);
 	}
 }
 

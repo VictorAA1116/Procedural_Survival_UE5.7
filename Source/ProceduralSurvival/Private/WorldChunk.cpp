@@ -67,7 +67,6 @@ void AWorldChunk::SetVoxelLocal(int LocalX, int LocalY, int LocalZ, bool isSolid
 
 void AWorldChunk::GenerateVoxels()
 {
-
     if (!isInitialized || !WorldManager || !WorldManager->TerrainGenerator) return;
 
 	UTerrainGenerator* TerrainGen = WorldManager->TerrainGenerator;
@@ -280,15 +279,15 @@ void AWorldChunk::GenerateCubicMesh()
                 }
 
                 // Check neighbors and add faces if neighbor is empty
-                if (!NeighborSolid(x + 1, y, z)) AddCubeFace(0, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
-                if (!NeighborSolid(x - 1, y, z)) AddCubeFace(1, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
-                if (!NeighborSolid(x, y + 1, z)) AddCubeFace(2, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Front
-                if (!NeighborSolid(x, y - 1, z)) AddCubeFace(3, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Back
-                if (!NeighborSolid(x, y, z + 1)) AddCubeFace(4, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Top
+                if (!NeighborSolid(x + Step, y, z)) AddCubeFace(0, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
+                if (!NeighborSolid(x - Step, y, z)) AddCubeFace(1, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
+                if (!NeighborSolid(x, y + Step, z)) AddCubeFace(2, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Front
+                if (!NeighborSolid(x, y - Step, z)) AddCubeFace(3, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Back
+                if (!NeighborSolid(x, y, z + Step)) AddCubeFace(4, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Top
 
                 if (!ShouldCullBottomFace(x, y, z))
                 {
-                    if (!NeighborSolid(x, y, z - 1)) AddCubeFace(5, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Bottom
+                    if (!NeighborSolid(x, y, z - Step)) AddCubeFace(5, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Bottom
                 }
             }
         }
@@ -304,7 +303,7 @@ void AWorldChunk::GenerateCubicMesh()
 
 void AWorldChunk::GenerateMarchingCubesMesh()
 {
-    if (!WorldManager || !WorldManager->AreAllNeighborChunksVoxelReady(ChunkCoords))
+    if (CurrentLODLevel == 0 && (!WorldManager || !WorldManager->AreAllNeighborChunksVoxelReady(ChunkCoords)))
     {
         return;
     }
@@ -557,15 +556,18 @@ float AWorldChunk::SampleDensityForMarching(int GlobalX, int GlobalY, int Global
     FIntVector LocalXYZ;
     WorldManager->GlobalVoxelToChunkCoords(GlobalX, GlobalY, GlobalZ, ChunkXY, LocalXYZ);
 
-    if (AWorldChunk* Neighbor = WorldManager->GetChunkAt(ChunkXY))
+    if (!useProceduralDensityOnly)
     {
-        if (Neighbor->AreVoxelsGenerated() && LocalXYZ.X >= 0 && LocalXYZ.X < Neighbor->GetChunkSizeXY() && LocalXYZ.Y >= 0 && LocalXYZ.Y < Neighbor->GetChunkSizeXY() && LocalXYZ.Z >= 0 && LocalXYZ.Z < Neighbor->GetChunkHeightZ())
+        if (AWorldChunk* Neighbor = WorldManager->GetChunkAt(ChunkXY))
         {
-            return Neighbor->GetVoxelDensity(LocalXYZ);;
+            if (Neighbor->AreVoxelsGenerated() && LocalXYZ.X >= 0 && LocalXYZ.X < Neighbor->GetChunkSizeXY() && LocalXYZ.Y >= 0 && LocalXYZ.Y < Neighbor->GetChunkSizeXY() && LocalXYZ.Z >= 0 && LocalXYZ.Z < Neighbor->GetChunkHeightZ())
+            {
+                return Neighbor->GetVoxelDensity(LocalXYZ);
+            }
         }
     }
 
-    if (!WorldManager->IsChunkWithinRenderDistance(ChunkXY) || !WorldManager->IsNeighborChunkLoaded(ChunkXY))
+    if (!useProceduralDensityOnly && (!WorldManager->IsChunkWithinRenderDistance(ChunkXY) || !WorldManager->IsNeighborChunkLoaded(ChunkXY)))
     {
         return -1.0f;
     }
@@ -616,6 +618,8 @@ float AWorldChunk::GetVoxelDensity(const FIntVector& LocalXYZ) const
 void AWorldChunk::GenerateMeshLOD(int32 LODLevel)
 {
 	CurrentLODLevel = LODLevel;
+
+    useProceduralDensityOnly = (LODLevel > 0);
 
 	isFinalMesh = (LODLevel == 0);
 

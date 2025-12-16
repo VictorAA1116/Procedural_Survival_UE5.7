@@ -38,9 +38,11 @@ public:
 	bool AreVoxelsGenerated() const { return VoxelsGenerated; }
 	float GetVoxelDensity(const FIntVector& LocalXYZ) const;
 	int GetCurrentLODLevel() const { return CurrentLODLevel; }
+    void SetCurrentLODLevel(int NewLODLevel) { CurrentLODLevel = NewLODLevel; }
 
     bool isInitialized = false;
-	
+    bool isQueuedForVoxelGen = false;
+    bool useProceduralDensityOnly = false;
 
 protected:
     virtual void BeginPlay() override;
@@ -66,7 +68,7 @@ private:
 
 	// Current LOD level of this chunk (-1 means not set)
     UPROPERTY()
-	int32 CurrentLODLevel = -1;
+	int32 CurrentLODLevel = 0;
 
 	// Current LOD step for progressive LOD generation
     UPROPERTY()
