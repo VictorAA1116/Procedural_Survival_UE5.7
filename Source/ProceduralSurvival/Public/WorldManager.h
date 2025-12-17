@@ -126,4 +126,5 @@ private:
 	void DestroyChunkAt(const FIntPoint& ChunkXY);
 	void OnChunkCreated(const FIntPoint& ChunkXY);
 	void SortChunkQueueByDistance();
+	void SortLODQueueByDistance();
 };

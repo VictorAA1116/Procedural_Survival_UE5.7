@@ -74,11 +74,24 @@ void AWorldManager::Tick(float DeltaTime)
 
 		if (DesiredLOD != Chunk->GetCurrentLODLevel())
 		{
+			const int32 OldLOD = Chunk->GetCurrentLODLevel();
 			Chunk->SetCurrentLODLevel(DesiredLOD);
-			if (!Chunk->isQueuedForVoxelGen)
+
+			if (DesiredLOD == 0)
 			{
-				Chunk->isQueuedForVoxelGen = true;
-				ChunkGenQueue.Add(Pair.Key);
+				if (!Chunk->AreVoxelsGenerated() && !Chunk->isQueuedForVoxelGen)
+				{
+					ChunkGenQueue.Add(Pair.Key);
+					Chunk->isQueuedForVoxelGen = true;
+				}
+				else if (Chunk->AreVoxelsGenerated())
+				{
+					Chunk->GenerateMeshLOD(0);
+				}
+			}
+			else
+			{
+				EnqueueLODMeshBuild(Pair.Key, DesiredLOD);
 			}
 		}
 	}
@@ -92,6 +105,8 @@ void AWorldManager::Tick(float DeltaTime)
 		{
 			LODBuildAccumulator -= NumToProcess;
 			NumToProcess = FMath::Min(NumToProcess, LODQueue.Num());
+
+			SortLODQueueByDistance();
 
 			for (int32 i = 0; i < NumToProcess; ++i)
 			{
@@ -172,6 +187,21 @@ void AWorldManager::SortChunkQueueByDistance()
 	});
 }
 
+void AWorldManager::SortLODQueueByDistance()
+{
+	if (!PlayerPawn) return;
+
+	FVector PlayerPos = PlayerPawn->GetActorLocation();
+
+	const float ChunkWorldSize = ChunkSizeXY * VoxelScale;
+
+	LODQueue.Sort([&](const FIntPoint& A, const FIntPoint& B) {
+		FVector PosA = FVector(A.X * ChunkWorldSize, A.Y * ChunkWorldSize, 0.0f);
+		FVector PosB = FVector(B.X * ChunkWorldSize, B.Y * ChunkWorldSize, 0.0f);
+		return FVector::DistSquared(PosA, PlayerPos) < FVector::DistSquared(PosB, PlayerPos);
+		});
+}
+
 FIntVector AWorldManager::WorldPosToGlobalVoxel(const FVector& WorldPos) const
 {
 	// WorldPos is in centimeters, convert to voxel indices
@@ -237,7 +267,6 @@ void AWorldManager::UpdateChunks()
 			if (!ActiveChunks.Find(ChunkXY))
 			{
 				RegisterChunkAt(ChunkXY);
-				ChunkGenQueue.Add(ChunkXY);
 			}
 		}
 	}
@@ -293,6 +322,10 @@ void AWorldManager::RegisterChunkAt(const FIntPoint& ChunkXY)
 		{
 			NewChunk->isQueuedForVoxelGen = true;
 			ChunkGenQueue.Add(ChunkXY);
+		}
+		else if (NewChunk->GetCurrentLODLevel() > 0)
+		{
+			EnqueueLODMeshBuild(ChunkXY, NewChunk->GetCurrentLODLevel());
 		}
 	}
 }
@@ -400,6 +433,9 @@ void AWorldManager::EnqueueInitialLODs()
 	for (auto& Pair : ActiveChunks)
 	{
 		const FIntPoint ChunkXY = Pair.Key;
+
+		//EnqueueLODMeshBuild(ChunkXY, MaxLODLevel);
+
 		AWorldChunk* Chunk = Pair.Value;
 		if (!Chunk) continue;
 

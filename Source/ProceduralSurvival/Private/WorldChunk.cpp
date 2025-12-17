@@ -225,6 +225,22 @@ void AWorldChunk::GenerateCubicMesh()
                     z * VoxelScale
                 );
 
+                auto IsOnChunkBorder = [&](int x, int y)
+                {
+                    return (x == 0 || x + Step >= ChunkSizeXY || y == 0 || y + Step >= ChunkSizeXY);
+                };
+
+                auto IsNeighborDifferentLOD = [&](int dx, int dy) -> bool
+                {
+					FIntPoint NeighborXY = ChunkCoords + FIntPoint(dx, dy);
+                    
+					AWorldChunk* Neighbor = WorldManager->GetChunkAt(NeighborXY);
+					if (!Neighbor) return false;
+
+                    int NeighborLOD = Neighbor->GetCurrentLODLevel();
+					return (NeighborLOD != CurrentLODLevel);
+				};
+
                 auto NeighborSolid = [&](int NX, int NY, int NZ) -> bool
                 {
                     int GlobalX = ChunkCoords.X * ChunkSizeXY + NX;
@@ -232,6 +248,17 @@ void AWorldChunk::GenerateCubicMesh()
                     int GlobalZ = NZ;
 
                     if (!WorldManager) return true;
+
+                    if (IsNeighborDifferentLOD(GlobalX, GlobalY))
+                    {
+                        return false;
+                    }
+
+                    if (useProceduralDensityOnly)
+                    {
+                        float NeighborDensity = WorldManager->TerrainGenerator->GetDensity(GlobalX, GlobalY, GlobalZ);
+                        return (NeighborDensity >= 0.0f);
+					}
 
                     FIntPoint NeighborChunkXY;
                     NeighborChunkXY.X = FMath::FloorToInt((float)GlobalX / ChunkSizeXY);
@@ -279,10 +306,71 @@ void AWorldChunk::GenerateCubicMesh()
                 }
 
                 // Check neighbors and add faces if neighbor is empty
-                if (!NeighborSolid(x + Step, y, z)) AddCubeFace(0, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
-                if (!NeighborSolid(x - Step, y, z)) AddCubeFace(1, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
-                if (!NeighborSolid(x, y + Step, z)) AddCubeFace(2, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Front
-                if (!NeighborSolid(x, y - Step, z)) AddCubeFace(3, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Back
+
+                if (x + Step >= ChunkSizeXY)
+                {
+                    if (IsNeighborDifferentLOD(1, 0))
+                    {
+                        AddCubeFace(0, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
+					}
+                    else if (!NeighborSolid(x + Step, y, z))
+                    {
+                        AddCubeFace(0, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
+                    }
+                }
+                else if (!NeighborSolid(x + Step, y, z))
+                {
+                    AddCubeFace(0, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
+				}
+
+                if (x - Step < 0)
+                {
+                    if (IsNeighborDifferentLOD(-1, 0))
+                    {
+                        AddCubeFace(1, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
+                    }
+                    else if (!NeighborSolid(x - Step, y, z))
+                    {
+                        AddCubeFace(1, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
+                    }
+                }
+                else if (!NeighborSolid(x - Step, y, z))
+                {
+                    AddCubeFace(1, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
+				}
+
+                if (y + Step >= ChunkSizeXY)
+                {
+                    if (IsNeighborDifferentLOD(0, 1))
+                    {
+                        AddCubeFace(2, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Front
+                    }
+                    else if (!NeighborSolid(x, y + Step, z))
+                    {
+                        AddCubeFace(2, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Front
+                    }
+                }
+                else if (!NeighborSolid(x, y + Step, z))
+                {
+                    AddCubeFace(2, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Front
+                }
+
+                if (y - Step < 0)
+                {
+                    if (IsNeighborDifferentLOD(0, -1))
+                    {
+                        AddCubeFace(3, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Back
+                    }
+                    else if (!NeighborSolid(x, y - Step, z))
+                    {
+                        AddCubeFace(3, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Back
+                    }
+                }
+                else if (!NeighborSolid(x, y - Step, z))
+                {
+                    AddCubeFace(3, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Back
+                }
+
                 if (!NeighborSolid(x, y, z + Step)) AddCubeFace(4, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Top
 
                 if (!ShouldCullBottomFace(x, y, z))
@@ -509,6 +597,41 @@ void AWorldChunk::GenerateMarchingCubesMesh()
         }
     }
 
+    Vertices.Reserve(Vertices.Num() + 1024);
+    Normals.Reserve(Normals.Num() + 1024);
+    UVs.Reserve(UVs.Num() + 1024);
+    VertexColors.Reserve(VertexColors.Num() + 1024);
+    Triangles.Reserve(Triangles.Num() + 2048);
+
+
+    const float SkirtDepth = VoxelScale * CurrentLODStep * 2.0f;
+
+    auto AddSkirtQuad = [&](const FVector& A, const FVector& B)
+    {
+        int32 Start = Vertices.Num();
+
+        FVector A2 = A - FVector(0, 0, SkirtDepth);
+        FVector B2 = B - FVector(0, 0, SkirtDepth);
+
+        Vertices.Add(A);
+        Vertices.Add(B);
+        Vertices.Add(B2);
+        Vertices.Add(A2);
+
+        FVector Normal = FVector::CrossProduct(B - A, A2 - A).GetSafeNormal();
+        for (int i = 0; i < 4; ++i)
+        {
+            Normals.Add(Normal);
+            UVs.Add(FVector2D(0.0f, 0.0f));
+            VertexColors.Add(FColor::Black);
+        }
+
+        Triangles.Append({
+            Start + 0, Start + 1, Start + 2,
+            Start + 0, Start + 2, Start + 3
+        });
+    };
+
 	Normals.Init(FVector::ZeroVector, Vertices.Num());
 
     for (int32 i = 0; i < NormalAcc.Num(); ++i)
@@ -526,6 +649,34 @@ void AWorldChunk::GenerateMarchingCubesMesh()
 	}
 
     Mesh->CreateMeshSection(0, Vertices, Triangles, Normals, UVs, VertexColors, {}, true);
+
+	const int32 VertexCount = Vertices.Num();
+
+    for (int i = 0; i < VertexCount; ++i)
+    {
+		const FVector V = Vertices[i];
+        const bool bBorder = V.X <= 0.01f || V.X >= ChunkSizeXY * VoxelScale - 0.01f || V.Y <= 0.01f || V.Y >= ChunkSizeXY * VoxelScale - 0.01f;
+
+        if (bBorder)
+        {
+            if (V.X <= 0.01f)
+            {
+                AddSkirtQuad(V, V + FVector(0.01, 0, 0));
+            }
+            else if (V.X >= ChunkSizeXY * VoxelScale - 0.01f)
+            {
+                AddSkirtQuad(V, V - FVector(0.01, 0, 0));
+			}
+            else if (V.Y <= 0.01f)
+            {
+                AddSkirtQuad(V, V + FVector(0, 0.01, 0));
+            }
+            else if (V.Y >= ChunkSizeXY * VoxelScale - 0.01f)
+            {
+                AddSkirtQuad(V, V - FVector(0, 0.01, 0));
+			}
+        }
+    }
 
     if (BiomeDebugMaterial)
     {
