@@ -38,6 +38,10 @@ public:
 
 	int32 ComputeLODForChunk(const FIntPoint& ChunkXY) const;
 
+	void EnqueueInitialLODs();
+
+	void EnqueueLODMeshBuild(const FIntPoint& ChunkXY, int32 LOD);
+
 	// Voxel rendering mode (Cubes or Marching Cubes)
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	EVoxelRenderMode RenderMode = EVoxelRenderMode::Cubes;
@@ -107,6 +111,15 @@ private:
 
 	// Current center chunk coordinates based on player position
 	FIntPoint CenterChunk = FIntPoint::ZeroValue;
+
+	TArray<FIntPoint> LODQueue;
+	TMap<FIntPoint, int32> PendingLOD;
+
+	float LODBuildAccumulator = 0.0f;
+
+	// LOD build rate in LOD builds per second (60 = 1 LOD build per frame at 60 FPS)
+	UPROPERTY(EditAnywhere, Category = "LOD")
+	float LODBuildRate = 30.0f; // LOD builds per second
 
 	void UpdateChunks();
 	void RegisterChunkAt(const FIntPoint& ChunkXY);
