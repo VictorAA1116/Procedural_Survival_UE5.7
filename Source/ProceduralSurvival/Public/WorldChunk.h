@@ -10,6 +10,13 @@
 class UProceduralMeshComponent;
 class AWorldManager;
 
+enum class EChunkGenPhase : uint8
+{
+    None,
+    Voxels,
+    MeshLOD0
+};
+
 UCLASS()
 class PROCEDURALSURVIVAL_API AWorldChunk : public AActor
 {
@@ -43,6 +50,10 @@ public:
     bool isInitialized = false;
     bool isQueuedForVoxelGen = false;
     bool useProceduralDensityOnly = false;
+	bool isLOD0Built = false;
+	bool isLOD0SeamDirty = false;
+
+	EChunkGenPhase CurrentGenPhase = EChunkGenPhase::None;
 
 protected:
     virtual void BeginPlay() override;

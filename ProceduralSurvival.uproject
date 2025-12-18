@@ -30,6 +30,14 @@
 		{
 			"Name": "GameplayStateTree",
 			"Enabled": true
+		},
+		{
+			"Name": "ChaosCloth",
+			"Enabled": false
+		},
+		{
+			"Name": "Metasound",
+			"Enabled": false
 		}
 	]
 }

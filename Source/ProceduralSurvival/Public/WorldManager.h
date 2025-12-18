@@ -124,7 +124,8 @@ private:
 	void UpdateChunks();
 	void RegisterChunkAt(const FIntPoint& ChunkXY);
 	void DestroyChunkAt(const FIntPoint& ChunkXY);
-	void OnChunkCreated(const FIntPoint& ChunkXY);
+	void RegenerateChunk(const FIntPoint& Center, int32 OldLOD, int32 NewLOD);
 	void SortChunkQueueByDistance();
 	void SortLODQueueByDistance();
+	void MarkLOD0NeighborSeamDirty(const FIntPoint& Center);
 };

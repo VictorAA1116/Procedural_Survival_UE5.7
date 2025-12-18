@@ -29,6 +29,8 @@ void AWorldChunk::InitializeChunk(int InChunkSizeXY, int InChunkHeightZ, float I
     const int32 Total = ChunkSizeXY * ChunkSizeXY * ChunkHeightZ;
     VoxelData.SetNumZeroed(Total);
 
+	isLOD0Built = false;
+	isLOD0SeamDirty = true;
     isInitialized = true;
 }
 
@@ -210,6 +212,35 @@ void AWorldChunk::GenerateCubicMesh()
     {
         for (int y = 0; y < ChunkSizeXY; y += Step)
         {
+            const int DepthSteps = 1;
+			int32 SurfaceZ = -1;
+
+            auto SampleSolidAt = [&](int LX, int LY, int LZ) -> bool
+            {
+                int gx2 = ChunkCoords.X * ChunkSizeXY + LX;
+                int gy2 = ChunkCoords.Y * ChunkSizeXY + LY;
+                
+				const float Density = (CurrentLODLevel == 0 && AreVoxelsGenerated()) 
+                    ? GetVoxelDensity({ LX, LY, LZ }) 
+                    : WorldManager->TerrainGenerator->GetDensity(gx2, gy2, LZ);
+
+				return (Density >= 0.0f);
+            };
+
+            for (int z2 = ChunkHeightZ - Step; z2 >= 0; z2 -= Step)
+            {
+				const bool isSolid = SampleSolidAt(x, y, z2);
+				const bool isAirAbove = (z2 + Step >= ChunkHeightZ) ? true : !SampleSolidAt(x, y, z2 + Step);
+
+                if (isSolid && isAirAbove)
+                {
+                    SurfaceZ = z2;
+                    break;
+				}
+			}
+
+            const int32 MinSeamZ = (SurfaceZ < 0) ? INT32_MAX : FMath::Max(0, SurfaceZ - DepthSteps * Step);
+
             for (int z = 0; z < ChunkHeightZ; z += Step)
             {
 				const int gx = ChunkCoords.X * ChunkSizeXY + x;
@@ -248,11 +279,6 @@ void AWorldChunk::GenerateCubicMesh()
                     int GlobalZ = NZ;
 
                     if (!WorldManager) return true;
-
-                    if (IsNeighborDifferentLOD(GlobalX, GlobalY))
-                    {
-                        return false;
-                    }
 
                     if (useProceduralDensityOnly)
                     {
@@ -306,10 +332,11 @@ void AWorldChunk::GenerateCubicMesh()
                 }
 
                 // Check neighbors and add faces if neighbor is empty
+				const bool isNearSurface = (z >= MinSeamZ);
 
                 if (x + Step >= ChunkSizeXY)
                 {
-                    if (IsNeighborDifferentLOD(1, 0))
+                    if (IsNeighborDifferentLOD(1, 0) && isNearSurface)
                     {
                         AddCubeFace(0, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Right
 					}
@@ -325,7 +352,7 @@ void AWorldChunk::GenerateCubicMesh()
 
                 if (x - Step < 0)
                 {
-                    if (IsNeighborDifferentLOD(-1, 0))
+                    if (IsNeighborDifferentLOD(-1, 0) && isNearSurface)
                     {
                         AddCubeFace(1, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Left
                     }
@@ -341,7 +368,7 @@ void AWorldChunk::GenerateCubicMesh()
 
                 if (y + Step >= ChunkSizeXY)
                 {
-                    if (IsNeighborDifferentLOD(0, 1))
+                    if (IsNeighborDifferentLOD(0, 1) && isNearSurface)
                     {
                         AddCubeFace(2, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Front
                     }
@@ -357,7 +384,7 @@ void AWorldChunk::GenerateCubicMesh()
 
                 if (y - Step < 0)
                 {
-                    if (IsNeighborDifferentLOD(0, -1))
+                    if (IsNeighborDifferentLOD(0, -1) && isNearSurface)
                     {
                         AddCubeFace(3, BasePos, ScaledVoxel, BiomeColor, Vertices, Triangles, Normals, UVs, VertexColors); // Back
                     }
@@ -382,6 +409,8 @@ void AWorldChunk::GenerateCubicMesh()
     }
 
     Mesh->CreateMeshSection(0, Vertices, Triangles, Normals, UVs, VertexColors, {}, true);
+
+    isLOD0Built = true;
 
     if (BiomeDebugMaterial)
     {

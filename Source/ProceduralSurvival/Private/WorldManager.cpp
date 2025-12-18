@@ -59,80 +59,85 @@ void AWorldManager::Tick(float DeltaTime)
 	NewCenterChunk.X = FMath::FloorToInt((float)GV.X / ChunkSizeXY);
 	NewCenterChunk.Y = FMath::FloorToInt((float)GV.Y / ChunkSizeXY);
 
+	// Check if center chunk has changed, update it
 	if (NewCenterChunk != CenterChunk)
 	{
 		CenterChunk = NewCenterChunk;
 		UpdateChunks();
 	}
 
-	for (auto& Pair : ActiveChunks)
+	TArray<FIntPoint> ActiveChunkKeys;
+	ActiveChunks.GetKeys(ActiveChunkKeys);
+
+	// Update LODs for active chunks
+	for (const FIntPoint& ChunkXY : ActiveChunkKeys)
 	{
-		AWorldChunk* Chunk = Pair.Value;
+		AWorldChunk* Chunk = GetChunkAt(ChunkXY);
 		if (!Chunk) continue;
 
-		const int32 DesiredLOD = ComputeLODForChunk(Pair.Key);
+		const int32 DesiredLOD = ComputeLODForChunk(ChunkXY);
 
 		if (DesiredLOD != Chunk->GetCurrentLODLevel())
 		{
 			const int32 OldLOD = Chunk->GetCurrentLODLevel();
 			Chunk->SetCurrentLODLevel(DesiredLOD);
+			RegenerateChunk(ChunkXY, OldLOD, DesiredLOD);
 
 			if (DesiredLOD == 0)
 			{
-				if (!Chunk->AreVoxelsGenerated() && !Chunk->isQueuedForVoxelGen)
+				if (!Chunk->AreVoxelsGenerated())
 				{
-					ChunkGenQueue.Add(Pair.Key);
+					Chunk->CurrentGenPhase = EChunkGenPhase::Voxels;
+				}
+				else
+				{
+					Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+				}
+
+				if (!Chunk->isQueuedForVoxelGen)
+				{
+					ChunkGenQueue.Add(ChunkXY);
 					Chunk->isQueuedForVoxelGen = true;
 				}
-				else if (Chunk->AreVoxelsGenerated())
-				{
-					Chunk->GenerateMeshLOD(0);
-				}
 			}
-			else
+			else if (DesiredLOD > 0)
 			{
-				EnqueueLODMeshBuild(Pair.Key, DesiredLOD);
+				EnqueueLODMeshBuild(ChunkXY, DesiredLOD);
 			}
 		}
 	}
 
-	if (LODQueue.Num() > 0)
+	// LOD0 safety net
+	for (const FIntPoint& ChunkXY : ActiveChunkKeys)
 	{
-		LODBuildAccumulator += DeltaTime * LODBuildRate;
-		int32 NumToProcess = FMath::FloorToInt(LODBuildAccumulator);
+		AWorldChunk* Chunk = GetChunkAt(ChunkXY);
 
-		if (NumToProcess > 0)
+		if (!Chunk) continue;
+		if (Chunk->GetCurrentLODLevel() != 0) continue;
+
+		if (!Chunk->AreVoxelsGenerated())
 		{
-			LODBuildAccumulator -= NumToProcess;
-			NumToProcess = FMath::Min(NumToProcess, LODQueue.Num());
+			Chunk->CurrentGenPhase = EChunkGenPhase::Voxels;
+		}
+		else if (!Chunk->isLOD0Built)
+		{
+			Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+		}
+		else
+		{
+			continue;
+		}
 
-			SortLODQueueByDistance();
-
-			for (int32 i = 0; i < NumToProcess; ++i)
-			{
-				const FIntPoint ChunkXY = LODQueue[0];
-				LODQueue.RemoveAt(0);
-
-				AWorldChunk* Chunk = GetChunkAt(ChunkXY);
-				if (!Chunk) continue;
-
-				int32* DesiredLODPtr = PendingLOD.Find(ChunkXY);
-				if (!DesiredLODPtr) continue;
-
-				const int32 LOD = *DesiredLODPtr;
-				PendingLOD.Remove(ChunkXY);
-
-				if (LOD > 0)
-				{
-					Chunk->GenerateMeshLOD(LOD);
-				}
-			}
+		if (!Chunk->isQueuedForVoxelGen)
+		{
+			ChunkGenQueue.Add(ChunkXY);
+			Chunk->isQueuedForVoxelGen = true;
 		}
 	}
 
+	// Process chunk generation queue
 	if (ChunkGenQueue.Num() > 0)
 	{
-
 		ChunkGenAccumulator += DeltaTime * ChunkGenRate;
 
 		int32 NumToProcess = FMath::FloorToInt(ChunkGenAccumulator);
@@ -145,27 +150,143 @@ void AWorldManager::Tick(float DeltaTime)
 
 			SortChunkQueueByDistance();
 
+			TArray<FIntPoint> Batch;
+			Batch.Reserve(NumToProcess);
+
 			for (int32 i = 0; i < NumToProcess; ++i)
 			{
-				FIntPoint ChunkXY = ChunkGenQueue[0];
-				ChunkGenQueue.RemoveAt(0);
-				AWorldChunk** ChunkPtr = ActiveChunks.Find(ChunkXY);
+				Batch.Add(ChunkGenQueue[i]);
+			}
 
-				if (ChunkPtr && *ChunkPtr)
+			ChunkGenQueue.RemoveAt(0, NumToProcess);
+
+			for (const FIntPoint& ChunkXY : Batch)
+			{	
+				AWorldChunk* Chunk = GetChunkAt(ChunkXY);
+				if (!Chunk)
 				{
-					(*ChunkPtr)->GenerateVoxels();
-					(*ChunkPtr)->isQueuedForVoxelGen = false;
-					
-					if ((*ChunkPtr)->GetCurrentLODLevel() == 0)
+					UE_LOG(LogTemp, Error,
+						TEXT("[ChunkGen] Missing chunk actor at %d,%d"),
+						ChunkXY.X, ChunkXY.Y);
+					continue;
+				}
+
+				Chunk->isQueuedForVoxelGen = false;
+
+				UE_LOG(LogTemp, Warning,
+					TEXT("[ChunkGen] POP %d,%d | LOD=%d Phase=%d Vox=%d Built=%d SeamDirty=%d"),
+					ChunkXY.X, ChunkXY.Y,
+					Chunk->GetCurrentLODLevel(),
+					(int32)Chunk->CurrentGenPhase,
+					Chunk->AreVoxelsGenerated() ? 1 : 0,
+					Chunk->isLOD0Built ? 1 : 0,
+					Chunk->isLOD0SeamDirty ? 1 : 0);
+				
+				switch (Chunk->CurrentGenPhase)
+				{
+					case EChunkGenPhase::Voxels:
 					{
-						(*ChunkPtr)->GenerateMeshLOD(0);
-						OnChunkCreated(ChunkXY);
+						UE_LOG(LogTemp, Warning,
+							TEXT("[ChunkGen] -> GenerateVoxels %d,%d"),
+							ChunkXY.X, ChunkXY.Y);
+
+						Chunk->GenerateVoxels();
+						Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+
+						ChunkGenQueue.Add(ChunkXY);
+						Chunk->isQueuedForVoxelGen = true;
+						break;
 					}
-					else
+					case EChunkGenPhase::MeshLOD0:
 					{
-						int DesiredLOD = ComputeLODForChunk(ChunkXY);
-						(*ChunkPtr)->GenerateMeshLOD(DesiredLOD);
+						const bool needsFirstBuild = !Chunk->isLOD0Built;
+						const bool needsSeamUpdate = Chunk->isLOD0SeamDirty;
+
+						if (needsFirstBuild || needsSeamUpdate)
+						{
+							UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> GenerateMeshLOD0 %d,%d (First=%d Seam=%d)"),
+								ChunkXY.X, ChunkXY.Y, needsFirstBuild ? 1 : 0, needsSeamUpdate ? 1 : 0);
+
+							Chunk->GenerateMeshLOD(0);
+
+							Chunk->isLOD0Built = true;
+							Chunk->isLOD0SeamDirty = false;
+
+							UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> Mesh done %d,%d (Built=%d SeamDirty=%d)"),
+								ChunkXY.X, ChunkXY.Y, Chunk->isLOD0Built ? 1 : 0, Chunk->isLOD0SeamDirty ? 1 : 0);
+
+							if (needsFirstBuild)
+							{
+								MarkLOD0NeighborSeamDirty(ChunkXY);
+							}
+						}
+
+						Chunk->CurrentGenPhase = EChunkGenPhase::None;
+						Chunk->isQueuedForVoxelGen = false;
+
+						break;
 					}
+					default:
+					{
+						UE_LOG(LogTemp, Warning,
+							TEXT("[ChunkGen] DEFAULT phase %d,%d"),
+							ChunkXY.X, ChunkXY.Y);
+
+						if (Chunk->GetCurrentLODLevel() == 0)
+						{
+							Chunk->CurrentGenPhase = Chunk->AreVoxelsGenerated() ? EChunkGenPhase::MeshLOD0 : EChunkGenPhase::Voxels;
+
+							ChunkGenQueue.Add(ChunkXY);
+							Chunk->isQueuedForVoxelGen = true;
+						}
+						else
+						{
+							Chunk->isQueuedForVoxelGen = false;
+						}
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	// Process LOD mesh build queue
+	if (LODQueue.Num() > 0)
+	{
+		LODBuildAccumulator += DeltaTime * LODBuildRate;
+		int32 NumToProcess = FMath::FloorToInt(LODBuildAccumulator);
+
+		if (NumToProcess > 0)
+		{
+			LODBuildAccumulator -= NumToProcess;
+			NumToProcess = FMath::Min(NumToProcess, LODQueue.Num());
+
+			SortLODQueueByDistance();
+
+			TArray<FIntPoint> Batch;
+			Batch.Reserve(NumToProcess);
+
+			for (int32 i = 0; i < NumToProcess; ++i)
+			{
+				Batch.Add(LODQueue[i]);
+			}
+
+			LODQueue.RemoveAt(0, NumToProcess);
+
+			for (const FIntPoint& ChunkXY : Batch)
+			{
+				AWorldChunk* Chunk = GetChunkAt(ChunkXY);
+				if (!Chunk) continue;
+
+				int32* DesiredLODPtr = PendingLOD.Find(ChunkXY);
+				if (!DesiredLODPtr) continue;
+
+				const int32 LOD = *DesiredLODPtr;
+				PendingLOD.Remove(ChunkXY);
+
+				if (LOD > 0)
+				{
+					Chunk->GenerateMeshLOD(LOD);
 				}
 			}
 		}
@@ -311,21 +432,25 @@ void AWorldManager::RegisterChunkAt(const FIntPoint& ChunkXY)
 
 	if (NewChunk)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Spawning chunk at {%d,%d} world pos (%.1f, %.1f) - Active: %d"), ChunkXY.X, ChunkXY.Y, WorldX, WorldY, ActiveChunks.Num());
+		//UE_LOG(LogTemp, Warning, TEXT("Spawning chunk at {%d,%d} world pos (%.1f, %.1f) - Active: %d"), ChunkXY.X, ChunkXY.Y, WorldX, WorldY, ActiveChunks.Num());
 
 		ActiveChunks.Add(ChunkXY, NewChunk);
 		NewChunk->SetWorldManager(this);
 		NewChunk->SetRenderMode(RenderMode);
 		NewChunk->InitializeChunk(ChunkSizeXY, ChunkHeightZ, VoxelScale, ChunkXY);
 
-		if (NewChunk->GetCurrentLODLevel() == 0)
+		const int32 DesiredLOD = ComputeLODForChunk(ChunkXY);
+		NewChunk->SetCurrentLODLevel(DesiredLOD);
+
+		if (DesiredLOD == 0)
 		{
-			NewChunk->isQueuedForVoxelGen = true;
+			NewChunk->CurrentGenPhase = EChunkGenPhase::Voxels;
 			ChunkGenQueue.Add(ChunkXY);
+			NewChunk->isQueuedForVoxelGen = true;
 		}
-		else if (NewChunk->GetCurrentLODLevel() > 0)
+		else
 		{
-			EnqueueLODMeshBuild(ChunkXY, NewChunk->GetCurrentLODLevel());
+			EnqueueLODMeshBuild(ChunkXY, DesiredLOD);
 		}
 	}
 }
@@ -352,25 +477,56 @@ bool AWorldManager::IsChunkWithinRenderDistance(const FIntPoint& ChunkXY) const
 	return (DX <= RenderDistance && DY <= RenderDistance);
 }
 
-void AWorldManager::OnChunkCreated(const FIntPoint& ChunkXY)
+void AWorldManager::RegenerateChunk(const FIntPoint& Center, int32 OldLOD, int32 NewLOD)
 {
-	static const FIntPoint Neighbors[4] = {
+	static const FIntPoint Offsets[5] =
+	{
+		FIntPoint(0, 0),
 		FIntPoint(1, 0),
 		FIntPoint(-1, 0),
 		FIntPoint(0, 1),
 		FIntPoint(0, -1)
 	};
 
-	for (const FIntPoint& Offset : Neighbors)
+	for (const FIntPoint& Offset : Offsets)
 	{
-		FIntPoint NeighborXY = ChunkXY + Offset;
-		AWorldChunk** NeighborPtr = ActiveChunks.Find(NeighborXY);
-		if (NeighborPtr && *NeighborPtr)
+		const FIntPoint ChunkXY = Center + Offset;
+
+		AWorldChunk* Chunk = GetChunkAt(ChunkXY);
+		if (!Chunk) continue;
+
+		const int32 DesiredLOD = ComputeLODForChunk(ChunkXY);
+
+		if (Chunk->GetCurrentLODLevel() != DesiredLOD)
 		{
-			if ((*NeighborPtr)->GetCurrentLODLevel() == 0 && (*NeighborPtr)->AreVoxelsGenerated())
+			Chunk->SetCurrentLODLevel(DesiredLOD);
+		}
+
+		if (DesiredLOD == 0)
+		{
+			if (!Chunk->AreVoxelsGenerated())
 			{
-				(*NeighborPtr)->GenerateMeshLOD(0);
+				if (!Chunk->isQueuedForVoxelGen)
+				{
+					Chunk->CurrentGenPhase = EChunkGenPhase::Voxels;
+					ChunkGenQueue.Add(ChunkXY);
+					Chunk->isQueuedForVoxelGen = true;
+				}
+				continue;
 			}
+			else if (!Chunk->isLOD0Built || Chunk->isLOD0SeamDirty)
+			{
+				if (!Chunk->isQueuedForVoxelGen)
+				{
+					Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+					ChunkGenQueue.Add(ChunkXY);
+					Chunk->isQueuedForVoxelGen = true;
+				}
+			}
+		}
+		else
+		{
+			EnqueueLODMeshBuild(ChunkXY, DesiredLOD);
 		}
 	}
 }
@@ -391,6 +547,9 @@ bool AWorldManager::AreAllNeighborChunksVoxelReady(const FIntPoint& ChunkXY) con
 	for (const FIntPoint& Offset : Neighbors)
 	{
 		const FIntPoint NeighborXY = ChunkXY + Offset;
+
+		if (!IsNeighborChunkLoaded(NeighborXY)) continue;
+
 		AWorldChunk* const* NeighborPtr = ActiveChunks.Find(NeighborXY);
 		if (!NeighborPtr || !(*NeighborPtr) || !(*NeighborPtr)->AreVoxelsGenerated())
 		{
@@ -430,13 +589,12 @@ int32 AWorldManager::ComputeLODForChunk(const FIntPoint& ChunkXY) const
 
 void AWorldManager::EnqueueInitialLODs()
 {
-	for (auto& Pair : ActiveChunks)
+	TArray<FIntPoint> ActiveChunkKeys;
+	ActiveChunks.GetKeys(ActiveChunkKeys);
+
+	for (const FIntPoint& ChunkXY : ActiveChunkKeys)
 	{
-		const FIntPoint ChunkXY = Pair.Key;
-
-		//EnqueueLODMeshBuild(ChunkXY, MaxLODLevel);
-
-		AWorldChunk* Chunk = Pair.Value;
+		AWorldChunk* Chunk = GetChunkAt(ChunkXY);
 		if (!Chunk) continue;
 
 		const int32 DesiredLOD = ComputeLODForChunk(ChunkXY);
@@ -444,13 +602,22 @@ void AWorldManager::EnqueueInitialLODs()
 
 		if (DesiredLOD == 0)
 		{
-			if (!Chunk->AreVoxelsGenerated() && !Chunk->isQueuedForVoxelGen)
+			if (!Chunk->AreVoxelsGenerated())
 			{
-				Chunk->isQueuedForVoxelGen = true;
+				Chunk->CurrentGenPhase = EChunkGenPhase::Voxels;
+			}
+			else
+			{
+				Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+			}
+
+			if (!Chunk->isQueuedForVoxelGen)
+			{
 				ChunkGenQueue.Add(ChunkXY);
+				Chunk->isQueuedForVoxelGen = true;
 			}
 		}
-		else
+		else if (DesiredLOD > 0)
 		{
 			EnqueueLODMeshBuild(ChunkXY, DesiredLOD);
 		}
@@ -466,5 +633,41 @@ void AWorldManager::EnqueueLODMeshBuild(const FIntPoint& ChunkXY, int32 LOD)
 	if (!LODQueue.Contains(ChunkXY))
 	{
 		LODQueue.Add(ChunkXY);
+	}
+}
+
+void AWorldManager::MarkLOD0NeighborSeamDirty(const FIntPoint& Center)
+{
+	static const FIntPoint Neighbors[4] =
+	{
+		FIntPoint(1, 0),
+		FIntPoint(-1, 0),
+		FIntPoint(0, 1),
+		FIntPoint(0, -1)
+	};
+
+	for (const FIntPoint& Offset : Neighbors)
+	{
+		const FIntPoint NeighborXY = Center + Offset;
+
+		AWorldChunk* Neighbor = GetChunkAt(NeighborXY);
+		if (!Neighbor) continue;
+
+		if (Neighbor->GetCurrentLODLevel() != 0) continue;
+		if (!Neighbor->AreVoxelsGenerated()) continue;
+		if (!Neighbor->isLOD0Built) continue;
+		if (Neighbor->isLOD0SeamDirty) continue;
+
+		Neighbor->isLOD0SeamDirty = true;
+
+		if (!Neighbor->isQueuedForVoxelGen)
+		{
+			Neighbor->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+			if (!ChunkGenQueue.Contains(NeighborXY))
+			{
+				ChunkGenQueue.Add(NeighborXY);
+			}
+			Neighbor->isQueuedForVoxelGen = true;
+		}
 	}
 }
