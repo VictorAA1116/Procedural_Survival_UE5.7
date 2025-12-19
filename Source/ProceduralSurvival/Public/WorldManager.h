@@ -127,5 +127,7 @@ private:
 	void RegenerateChunk(const FIntPoint& Center, int32 OldLOD, int32 NewLOD);
 	void SortChunkQueueByDistance();
 	void SortLODQueueByDistance();
+	void MarkLOD0Dirty(const FIntPoint& ChunkXY);
+	void MarkChunkAndNeighborsDirty(const FIntPoint& Center);
 	void MarkLOD0NeighborSeamDirty(const FIntPoint& Center);
 };

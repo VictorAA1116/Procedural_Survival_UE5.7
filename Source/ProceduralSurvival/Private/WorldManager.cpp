@@ -83,6 +83,11 @@ void AWorldManager::Tick(float DeltaTime)
 			Chunk->SetCurrentLODLevel(DesiredLOD);
 			RegenerateChunk(ChunkXY, OldLOD, DesiredLOD);
 
+			if (OldLOD != DesiredLOD)
+			{
+				MarkChunkAndNeighborsDirty(ChunkXY);
+			}
+
 			if (DesiredLOD == 0)
 			{
 				if (!Chunk->AreVoxelsGenerated())
@@ -495,11 +500,17 @@ void AWorldManager::RegenerateChunk(const FIntPoint& Center, int32 OldLOD, int32
 		AWorldChunk* Chunk = GetChunkAt(ChunkXY);
 		if (!Chunk) continue;
 
+		const int32 OldLODLevel = Chunk->GetCurrentLODLevel();
 		const int32 DesiredLOD = ComputeLODForChunk(ChunkXY);
 
 		if (Chunk->GetCurrentLODLevel() != DesiredLOD)
 		{
 			Chunk->SetCurrentLODLevel(DesiredLOD);
+
+			if (OldLODLevel != DesiredLOD)
+			{
+				MarkChunkAndNeighborsDirty(ChunkXY);
+			}
 		}
 
 		if (DesiredLOD == 0)
@@ -548,7 +559,7 @@ bool AWorldManager::AreAllNeighborChunksVoxelReady(const FIntPoint& ChunkXY) con
 	{
 		const FIntPoint NeighborXY = ChunkXY + Offset;
 
-		if (!IsNeighborChunkLoaded(NeighborXY)) continue;
+		if (!IsNeighborChunkLoaded(NeighborXY)) return false;
 
 		AWorldChunk* const* NeighborPtr = ActiveChunks.Find(NeighborXY);
 		if (!NeighborPtr || !(*NeighborPtr) || !(*NeighborPtr)->AreVoxelsGenerated())
@@ -650,24 +661,35 @@ void AWorldManager::MarkLOD0NeighborSeamDirty(const FIntPoint& Center)
 	{
 		const FIntPoint NeighborXY = Center + Offset;
 
-		AWorldChunk* Neighbor = GetChunkAt(NeighborXY);
-		if (!Neighbor) continue;
-
-		if (Neighbor->GetCurrentLODLevel() != 0) continue;
-		if (!Neighbor->AreVoxelsGenerated()) continue;
-		if (!Neighbor->isLOD0Built) continue;
-		if (Neighbor->isLOD0SeamDirty) continue;
-
-		Neighbor->isLOD0SeamDirty = true;
-
-		if (!Neighbor->isQueuedForVoxelGen)
-		{
-			Neighbor->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
-			if (!ChunkGenQueue.Contains(NeighborXY))
-			{
-				ChunkGenQueue.Add(NeighborXY);
-			}
-			Neighbor->isQueuedForVoxelGen = true;
-		}
+		MarkLOD0Dirty(NeighborXY);
 	}
+}
+
+void AWorldManager::MarkLOD0Dirty(const FIntPoint& ChunkXY)
+{
+	AWorldChunk* Chunk = GetChunkAt(ChunkXY);
+
+	if (!Chunk) return;
+	if (Chunk->GetCurrentLODLevel() != 0) return;
+	if (!Chunk->AreVoxelsGenerated()) return;
+	if (!Chunk->isLOD0Built) return;
+	if (Chunk->isLOD0SeamDirty) return;
+
+	Chunk->isLOD0SeamDirty = true;
+
+	if (!Chunk->isQueuedForVoxelGen)
+	{
+		Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+		if (!ChunkGenQueue.Contains(ChunkXY))
+		{
+			ChunkGenQueue.Add(ChunkXY);
+		}
+		Chunk->isQueuedForVoxelGen = true;
+	}
+}
+
+void AWorldManager::MarkChunkAndNeighborsDirty(const FIntPoint& ChunkXY)
+{
+	MarkLOD0Dirty(ChunkXY);
+	MarkLOD0NeighborSeamDirty(ChunkXY);
 }
