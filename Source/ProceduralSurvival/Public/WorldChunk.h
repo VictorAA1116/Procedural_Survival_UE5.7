@@ -35,7 +35,7 @@ public:
 
     void GenerateVoxels();
 
-	void GenerateMeshLOD(int32 LODLevel);
+	bool GenerateMeshLOD(int32 LODLevel);
 
     FIntPoint GetChunkCoords() const { return ChunkCoords; }
     int GetChunkSizeXY() const { return ChunkSizeXY; }
@@ -103,8 +103,8 @@ private:
 
     int LocalIndex(int X, int Y, int Z) const;
 
-    void GenerateCubicMesh();
-    void GenerateMarchingCubesMesh();
+    bool GenerateCubicMesh();
+    bool GenerateMarchingCubesMesh();
 
     float SampleDensityForMarching(int GlobalX, int GlobalY, int GlobalZ) const;
 

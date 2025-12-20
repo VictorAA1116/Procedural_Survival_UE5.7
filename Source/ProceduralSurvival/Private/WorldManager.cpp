@@ -51,6 +51,22 @@ void AWorldManager::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	UpdateCenterChunk();
+
+	TArray<FIntPoint> ActiveChunkKeys;
+	ActiveChunks.GetKeys(ActiveChunkKeys);
+
+	ProcessLODUpdates(ActiveChunkKeys);
+
+	LOD0SafetyNet(ActiveChunkKeys);
+
+	ProcessChunkGenQueue(DeltaTime);
+
+	ProcessLODQueue(DeltaTime);
+}
+
+void AWorldManager::UpdateCenterChunk()
+{
 	if (!PlayerPawn) return;
 
 	FVector PlayerPos = PlayerPawn->GetActorLocation();
@@ -65,10 +81,10 @@ void AWorldManager::Tick(float DeltaTime)
 		CenterChunk = NewCenterChunk;
 		UpdateChunks();
 	}
+}
 
-	TArray<FIntPoint> ActiveChunkKeys;
-	ActiveChunks.GetKeys(ActiveChunkKeys);
-
+void AWorldManager::ProcessLODUpdates(TArray<FIntPoint> ActiveChunkKeys)
+{
 	// Update LODs for active chunks
 	for (const FIntPoint& ChunkXY : ActiveChunkKeys)
 	{
@@ -111,7 +127,10 @@ void AWorldManager::Tick(float DeltaTime)
 			}
 		}
 	}
+}
 
+void AWorldManager::LOD0SafetyNet(TArray<FIntPoint> ActiveChunkKeys)
+{
 	// LOD0 safety net
 	for (const FIntPoint& ChunkXY : ActiveChunkKeys)
 	{
@@ -139,7 +158,10 @@ void AWorldManager::Tick(float DeltaTime)
 			Chunk->isQueuedForVoxelGen = true;
 		}
 	}
+}
 
+void AWorldManager::ProcessChunkGenQueue(float DeltaTime)
+{
 	// Process chunk generation queue
 	if (ChunkGenQueue.Num() > 0)
 	{
@@ -166,7 +188,7 @@ void AWorldManager::Tick(float DeltaTime)
 			ChunkGenQueue.RemoveAt(0, NumToProcess);
 
 			for (const FIntPoint& ChunkXY : Batch)
-			{	
+			{
 				AWorldChunk* Chunk = GetChunkAt(ChunkXY);
 				if (!Chunk)
 				{
@@ -186,75 +208,108 @@ void AWorldManager::Tick(float DeltaTime)
 					Chunk->AreVoxelsGenerated() ? 1 : 0,
 					Chunk->isLOD0Built ? 1 : 0,
 					Chunk->isLOD0SeamDirty ? 1 : 0);
-				
+
 				switch (Chunk->CurrentGenPhase)
 				{
 					case EChunkGenPhase::Voxels:
 					{
-						UE_LOG(LogTemp, Warning,
-							TEXT("[ChunkGen] -> GenerateVoxels %d,%d"),
-							ChunkXY.X, ChunkXY.Y);
-
-						Chunk->GenerateVoxels();
-						Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
-
-						ChunkGenQueue.Add(ChunkXY);
-						Chunk->isQueuedForVoxelGen = true;
+						ProcessVoxelPhase(Chunk, ChunkXY);
 						break;
 					}
 					case EChunkGenPhase::MeshLOD0:
 					{
-						const bool needsFirstBuild = !Chunk->isLOD0Built;
-						const bool needsSeamUpdate = Chunk->isLOD0SeamDirty;
-
-						if (needsFirstBuild || needsSeamUpdate)
-						{
-							UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> GenerateMeshLOD0 %d,%d (First=%d Seam=%d)"),
-								ChunkXY.X, ChunkXY.Y, needsFirstBuild ? 1 : 0, needsSeamUpdate ? 1 : 0);
-
-							Chunk->GenerateMeshLOD(0);
-
-							Chunk->isLOD0Built = true;
-							Chunk->isLOD0SeamDirty = false;
-
-							UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> Mesh done %d,%d (Built=%d SeamDirty=%d)"),
-								ChunkXY.X, ChunkXY.Y, Chunk->isLOD0Built ? 1 : 0, Chunk->isLOD0SeamDirty ? 1 : 0);
-
-							if (needsFirstBuild)
-							{
-								MarkLOD0NeighborSeamDirty(ChunkXY);
-							}
-						}
-
-						Chunk->CurrentGenPhase = EChunkGenPhase::None;
-						Chunk->isQueuedForVoxelGen = false;
-
+						ProcessMeshLOD0Phase(Chunk, ChunkXY);
 						break;
 					}
 					default:
 					{
-						UE_LOG(LogTemp, Warning,
-							TEXT("[ChunkGen] DEFAULT phase %d,%d"),
-							ChunkXY.X, ChunkXY.Y);
-
-						if (Chunk->GetCurrentLODLevel() == 0)
-						{
-							Chunk->CurrentGenPhase = Chunk->AreVoxelsGenerated() ? EChunkGenPhase::MeshLOD0 : EChunkGenPhase::Voxels;
-
-							ChunkGenQueue.Add(ChunkXY);
-							Chunk->isQueuedForVoxelGen = true;
-						}
-						else
-						{
-							Chunk->isQueuedForVoxelGen = false;
-						}
+						CatchUnqueuedChunks(Chunk, ChunkXY);
 						break;
 					}
 				}
 			}
 		}
 	}
+}
 
+void AWorldManager::ProcessVoxelPhase(AWorldChunk* Chunk, const FIntPoint& ChunkXY)
+{
+	UE_LOG(LogTemp, Warning,
+		TEXT("[ChunkGen] -> GenerateVoxels %d,%d"),
+		ChunkXY.X, ChunkXY.Y);
+
+	Chunk->GenerateVoxels();
+	Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+
+	MarkLOD0NeighborSeamDirty(ChunkXY);
+
+	ChunkGenQueue.Add(ChunkXY);
+	Chunk->isQueuedForVoxelGen = true;
+}
+
+void AWorldManager::ProcessMeshLOD0Phase(AWorldChunk* Chunk, const FIntPoint& ChunkXY)
+{
+	const bool needsFirstBuild = !Chunk->isLOD0Built;
+	const bool needsSeamUpdate = Chunk->isLOD0SeamDirty;
+
+	if (needsFirstBuild || needsSeamUpdate)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> GenerateMeshLOD0 %d,%d (First=%d Seam=%d)"),
+			ChunkXY.X, ChunkXY.Y, needsFirstBuild ? 1 : 0, needsSeamUpdate ? 1 : 0);
+
+		const bool isBuilt = Chunk->GenerateMeshLOD(0);
+
+		if (isBuilt)
+		{
+			Chunk->isLOD0Built = true;
+			Chunk->isLOD0SeamDirty = false;
+
+			UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> Mesh done %d,%d (Built=%d SeamDirty=%d)"),
+				ChunkXY.X, ChunkXY.Y, Chunk->isLOD0Built ? 1 : 0, Chunk->isLOD0SeamDirty ? 1 : 0);
+
+			if (needsFirstBuild)
+			{
+				MarkLOD0NeighborSeamDirty(ChunkXY);
+			}
+		}
+		else
+		{
+			Chunk->isLOD0SeamDirty = true;
+
+			if (!Chunk->isQueuedForVoxelGen)
+			{
+				Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+				ChunkGenQueue.Add(ChunkXY);
+				Chunk->isQueuedForVoxelGen = true;
+			}
+		}
+	}
+
+	Chunk->CurrentGenPhase = EChunkGenPhase::None;
+	Chunk->isQueuedForVoxelGen = false;
+}
+
+void AWorldManager::CatchUnqueuedChunks(AWorldChunk* Chunk, const FIntPoint& ChunkXY)
+{
+	UE_LOG(LogTemp, Warning,
+		TEXT("[ChunkGen] DEFAULT phase %d,%d"),
+		ChunkXY.X, ChunkXY.Y);
+
+	if (Chunk->GetCurrentLODLevel() == 0)
+	{
+		Chunk->CurrentGenPhase = Chunk->AreVoxelsGenerated() ? EChunkGenPhase::MeshLOD0 : EChunkGenPhase::Voxels;
+
+		ChunkGenQueue.Add(ChunkXY);
+		Chunk->isQueuedForVoxelGen = true;
+	}
+	else
+	{
+		Chunk->isQueuedForVoxelGen = false;
+	}
+}
+
+void AWorldManager::ProcessLODQueue(float DeltaTime)
+{
 	// Process LOD mesh build queue
 	if (LODQueue.Num() > 0)
 	{
@@ -692,4 +747,25 @@ void AWorldManager::MarkChunkAndNeighborsDirty(const FIntPoint& ChunkXY)
 {
 	MarkLOD0Dirty(ChunkXY);
 	MarkLOD0NeighborSeamDirty(ChunkXY);
+
+	static const FIntPoint Neighbors[4] =
+	{
+		FIntPoint(1, 0),
+		FIntPoint(-1, 0),
+		FIntPoint(0, 1),
+		FIntPoint(0, -1)
+	};
+
+	for (const FIntPoint& Offset : Neighbors)
+	{
+		const FIntPoint NeighborXY = ChunkXY + Offset;
+		AWorldChunk* Neighbor = GetChunkAt(NeighborXY);
+		if (!Neighbor) continue;
+
+		const int32 CurrentLOD = Neighbor->GetCurrentLODLevel();
+		if (CurrentLOD > 0)
+		{
+			EnqueueLODMeshBuild(NeighborXY, CurrentLOD);
+		}
+	}
 }

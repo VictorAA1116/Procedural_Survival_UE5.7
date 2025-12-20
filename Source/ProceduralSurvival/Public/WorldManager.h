@@ -130,4 +130,15 @@ private:
 	void MarkLOD0Dirty(const FIntPoint& ChunkXY);
 	void MarkChunkAndNeighborsDirty(const FIntPoint& Center);
 	void MarkLOD0NeighborSeamDirty(const FIntPoint& Center);
+
+	void UpdateCenterChunk();
+	void ProcessLODUpdates(TArray <FIntPoint> ActiveChunkKeys);
+	void LOD0SafetyNet(TArray <FIntPoint> ActiveChunkKeys);
+	void ProcessChunkGenQueue(float DeltaTime);
+	void ProcessLODQueue(float DeltaTime);
+	
+	void ProcessVoxelPhase(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
+	void ProcessMeshLOD0Phase(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
+	void CatchUnqueuedChunks(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
+	
 };

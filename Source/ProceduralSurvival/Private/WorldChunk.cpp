@@ -186,7 +186,7 @@ void AWorldChunk::AddCubeFace(int FaceIndex, FVector& Position, float CubeSize, 
     Triangles.Add(Start + 3);
 }
 
-void AWorldChunk::GenerateCubicMesh()
+bool AWorldChunk::GenerateCubicMesh()
 {
     if (Mesh)
     {
@@ -416,13 +416,15 @@ void AWorldChunk::GenerateCubicMesh()
     {
         Mesh->SetMaterial(0, BiomeDebugMaterial);
     }
+
+    return true;
 }
 
-void AWorldChunk::GenerateMarchingCubesMesh()
+bool AWorldChunk::GenerateMarchingCubesMesh()
 {
     if (CurrentLODLevel == 0 && (!WorldManager || !WorldManager->AreAllNeighborChunksVoxelReady(ChunkCoords)))
     {
-        return;
+        return false;
     }
 
     const float IsoLevel = 0.0f;
@@ -711,6 +713,8 @@ void AWorldChunk::GenerateMarchingCubesMesh()
     {
 		Mesh->SetMaterial(0, BiomeDebugMaterial);
     }
+
+	return true;
 }
 
 FVector AWorldChunk::VertexInterp(float IsoLevel, const FVector& P1, const FVector& P2, float ValP1, float ValP2) const
@@ -795,7 +799,7 @@ float AWorldChunk::GetVoxelDensity(const FIntVector& LocalXYZ) const
     return VoxelData[Index].density;
 }
 
-void AWorldChunk::GenerateMeshLOD(int32 LODLevel)
+bool AWorldChunk::GenerateMeshLOD(int32 LODLevel)
 {
 	CurrentLODLevel = LODLevel;
 
@@ -807,10 +811,12 @@ void AWorldChunk::GenerateMeshLOD(int32 LODLevel)
 
     if (RenderMode == EVoxelRenderMode::Cubes)
     {
-        GenerateCubicMesh();
+        return GenerateCubicMesh();
     }
     else if (RenderMode == EVoxelRenderMode::MarchingCubes)
     {
-        GenerateMarchingCubesMesh();
+        return GenerateMarchingCubesMesh();
 	}
+
+	return false;
 }
