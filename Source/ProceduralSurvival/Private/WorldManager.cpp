@@ -769,3 +769,59 @@ void AWorldManager::MarkChunkAndNeighborsDirty(const FIntPoint& ChunkXY)
 		}
 	}
 }
+
+bool AWorldManager::RemoveVoxel(const FVector& VoxelWorldLocation)
+{
+	FIntVector GlobalCoords = WorldPosToGlobalVoxel(VoxelWorldLocation);
+
+	FIntPoint ChunkXY;
+	FIntVector LocalXYZ;
+	GlobalVoxelToChunkCoords(GlobalCoords.X, GlobalCoords.Y, GlobalCoords.Z, ChunkXY, LocalXYZ);
+
+	AWorldChunk* Chunk = GetChunkAt(ChunkXY);
+
+	if (!Chunk) return false;
+	if (!Chunk->AreVoxelsGenerated()) return false;
+
+	Chunk->SetVoxelLocal(LocalXYZ.X, LocalXYZ.Y, LocalXYZ.Z, false);
+	Chunk->isLOD0SeamDirty = true;
+	
+	MarkLOD0NeighborSeamDirty(ChunkXY);
+
+	if (!Chunk->isQueuedForVoxelGen)
+	{
+		Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+		ChunkGenQueue.Add(ChunkXY);
+		Chunk->isQueuedForVoxelGen = true;
+	}
+
+	return true;
+}
+
+bool AWorldManager::AddVoxel(const FVector& VoxelWorldLocation)
+{
+	FIntVector GlobalCoords = WorldPosToGlobalVoxel(VoxelWorldLocation);
+
+	FIntPoint ChunkXY;
+	FIntVector LocalXYZ;
+	GlobalVoxelToChunkCoords(GlobalCoords.X, GlobalCoords.Y, GlobalCoords.Z, ChunkXY, LocalXYZ);
+
+	AWorldChunk* Chunk = GetChunkAt(ChunkXY);
+
+	if (!Chunk) return false;
+	if (!Chunk->AreVoxelsGenerated()) return false;
+
+	Chunk->SetVoxelLocal(LocalXYZ.X, LocalXYZ.Y, LocalXYZ.Z, true);
+	Chunk->isLOD0SeamDirty = true;
+
+	MarkLOD0NeighborSeamDirty(ChunkXY);
+
+	if (!Chunk->isQueuedForVoxelGen)
+	{
+		Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+		ChunkGenQueue.Add(ChunkXY);
+		Chunk->isQueuedForVoxelGen = true;
+	}
+
+	return true;
+}

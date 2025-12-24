@@ -42,6 +42,12 @@ public:
 
 	void EnqueueLODMeshBuild(const FIntPoint& ChunkXY, int32 LOD);
 
+	UFUNCTION(BlueprintCallable)
+	bool RemoveVoxel(const FVector& VoxelLocation);
+
+	UFUNCTION(BlueprintCallable)
+	bool AddVoxel(const FVector& VoxelLocation);
+
 	// Voxel rendering mode (Cubes or Marching Cubes)
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	EVoxelRenderMode RenderMode = EVoxelRenderMode::Cubes;

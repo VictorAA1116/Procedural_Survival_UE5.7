@@ -47,6 +47,9 @@ public:
 	int GetCurrentLODLevel() const { return CurrentLODLevel; }
     void SetCurrentLODLevel(int NewLODLevel) { CurrentLODLevel = NewLODLevel; }
 
+    UFUNCTION(BlueprintCallable)
+    AWorldManager* GetWorldManager() const { return WorldManager; }
+
     bool isInitialized = false;
     bool isQueuedForVoxelGen = false;
     bool useProceduralDensityOnly = false;
