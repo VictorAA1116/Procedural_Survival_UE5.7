@@ -98,11 +98,20 @@ public:
 	float GetDensity(float X, float Y, float Z) const;
 	FBiomeWeights GetBiomeWeights(float X, float Y) const;
 	EBiomeType GetDominantBiome(float X, float Y) const;
+	void InitializeSeed();
 
 protected:
 	
 
 private:	
+	UPROPERTY(EditAnywhere, Category = "Terrain | Seed")
+	bool UseRandomSeed = false;
+
+	UPROPERTY(EditAnywhere, Category = "Terrain | Seed")
+	int Seed;
+
+	FORCEINLINE float Hash2D(int32 X, int32 Y, int32 Salt) const;
+	FORCEINLINE FVector2D SeededCoords(float X, float Y, int32 Salt) const;
 	float GetPlainsHeight(int X, int Y) const;
 	float GetHillsHeight(int X, int Y) const;
 	float GetMountainsHeight(int X, int Y) const;

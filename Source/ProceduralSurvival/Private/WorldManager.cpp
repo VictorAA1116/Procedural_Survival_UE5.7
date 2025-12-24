@@ -20,6 +20,8 @@ void AWorldManager::BeginPlay()
 {
 	Super::BeginPlay();
 
+	TerrainGenerator->InitializeSeed();
+
 	TArray<AActor*> Found;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AWorldManager::StaticClass(), Found);
 	if (Found.Num() > 1)
