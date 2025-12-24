@@ -63,6 +63,7 @@ void AWorldChunk::SetVoxelLocal(int LocalX, int LocalY, int LocalZ, bool isSolid
     int Index = LocalIndex(LocalX, LocalY, LocalZ);
     if (Index < 0) return;
     VoxelData[Index].isSolid = isSolid;
+    VoxelData[Index].density = isSolid ? 1.0f : -1.0f;
 
     GenerateMeshLOD(WorldManager->ComputeLODForChunk(ChunkCoords));
 }
