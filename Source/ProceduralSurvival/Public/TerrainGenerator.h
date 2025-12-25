@@ -110,7 +110,7 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Terrain | Seed")
 	int Seed;
 
-	FORCEINLINE float Hash2D(int32 X, int32 Y, int32 Salt) const;
+	FORCEINLINE uint32 Hash1D(int32 V) const;
 	FORCEINLINE FVector2D SeededCoords(float X, float Y, int32 Salt) const;
 	float GetPlainsHeight(int X, int Y) const;
 	float GetHillsHeight(int X, int Y) const;

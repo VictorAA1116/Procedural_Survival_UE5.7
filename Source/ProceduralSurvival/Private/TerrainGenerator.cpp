@@ -133,7 +133,9 @@ void UTerrainGenerator::PickDominantBiomes(const FBiomeWeights& Weights, EBiomeT
 
 float UTerrainGenerator::GetTerrainHeight(float X, float Y) const
 {
-	float continents = FMath::PerlinNoise2D(FVector2D(X, Y) * ContinentFrequency);
+	const FVector2D P = SeededCoords(X * ContinentFrequency, Y * ContinentFrequency, Seed + SEED_CONTINENTS);
+
+	float continents = FMath::PerlinNoise2D(P);
 	continents = continents * ContinentAmplitude + ContinentBaseHeight;
 
 	FBiomeWeights Weight = GetBiomeWeights(X, Y);
@@ -200,19 +202,24 @@ void UTerrainGenerator::InitializeSeed()
 	}
 }
 
-FORCEINLINE float UTerrainGenerator::Hash2D(int32 X, int32 Y, int32 Salt) const
+FORCEINLINE uint32 UTerrainGenerator::Hash1D(int32 V) const
 {
-	uint32 Hash = HashCombineFast(
-		HashCombineFast(::GetTypeHash(X), ::GetTypeHash(Y)), GetTypeHash(Salt)
-	);
-
-	return (Hash / (float)UINT32_MAX) * 2.0 - 1.0;
+	uint32 X = (uint32)V;
+	X ^= X >> 16;
+	X *= 0x7feb352d;
+	X ^= X >> 15;
+	X *= 0x846ca68b;
+	X ^= X >> 16;
+	return X;
 }
 
 FORCEINLINE FVector2D UTerrainGenerator::SeededCoords(float X, float Y, int32 Salt) const
 {
-	const float Ox = Hash2D((int32)X, (int32)Y, Salt) * 10000.0f;
-	const float Oy = Hash2D((int32)X, (int32)Y, Salt ^ 0x9E3779B9) * 10000.0f;
+	const uint32 H1 = Hash1D(Salt);
+	const uint32 H2 = Hash1D(Salt ^ 0x9E3779B9);
+
+	const float Ox = ((H1 / (float)UINT32_MAX) * 2.0f - 1.0f) * 100000.0f;
+	const float Oy = ((H2 / (float)UINT32_MAX) * 2.0f - 1.0f) * 100000.0f;
 
 	return FVector2D(X + Ox, Y + Oy);
 }
