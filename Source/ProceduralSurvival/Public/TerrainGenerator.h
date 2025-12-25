@@ -29,11 +29,21 @@ class PROCEDURALSURVIVAL_API UTerrainGenerator : public UObject
 {
 	GENERATED_BODY()
 	
-public:	
+public:
+	float GetTerrainHeight(float X, float Y) const;
+	float GetDensity(float X, float Y, float Z) const;
+	FBiomeWeights GetBiomeWeights(float X, float Y) const;
+	EBiomeType GetDominantBiome(float X, float Y) const;
+	void InitializeSeed();
+
+protected:
+	
+
+private:	
 	// Surface noise to add small variations to the terrain surface
 	UPROPERTY(EditAnywhere, Category = "Terrain | Surface Noise")
 	float SurfaceNoiseAmplitude = 2.0f;
-	
+
 	// Noise frequency for continent shaping
 	UPROPERTY(EditAnywhere, Category = "Terrain | Continents")
 	float ContinentFrequency = 0.001f;
@@ -50,7 +60,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Terrain | Biomes")
 	float BiomeScale = 2000.0f;
 
-	// Frequency for plains biome generation (how often plains biomes spawn)
+	// How wide the area to blend between two biomes is
+	UPROPERTY(EditAnywhere, Category = "Terrain | Biomes")
+	float BlendWidth = 0.075f;
+
+	// Noise frequency for plains biome generation (how bumpy plains biome is)
 	UPROPERTY(EditAnywhere, Category = "Terrain | Plains")
 	float PlainsFrequency = 0.006f;
 
@@ -62,7 +76,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Terrain | Plains")
 	float PlainsBaseHeight = 10.0f;
 
-	// Frequency for hill biome generation (how often hill biomes spawn)
+	// Plains generate if perlin noise produces values from 0 to PlainsEdge.
+	UPROPERTY(EditAnywhere, Category = "Terrain | Plains")
+	float PlainsEdge = 0.40f;
+
+	// Noise frequency for hills biome generation (how bumpy hills biome is)
 	UPROPERTY(EditAnywhere, Category = "Terrain | Hills")
 	float HillsFrequency = 0.008f;
 
@@ -70,13 +88,25 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Terrain | Hills")
 	float HillsAmplitude = 25.0f;
 
-	// Frequency for mountain biome generation (how often mountain biomes spawn)
+	// Base height for hill biome
+	UPROPERTY(EditAnywhere, Category = "Terrain | Hills")
+	float HillsBaseHeight = 25.0f;
+
+	//Noise frequency for Mountains biome generation (how bumpy mountains biome is)
 	UPROPERTY(EditAnywhere, Category = "Terrain | Mountains")
 	float MountainsFrequency = 0.005f;
 
 	// Amplitude for mountain biome height variations
 	UPROPERTY(EditAnywhere, Category = "Terrain | Mountains")
 	float MountainsAmplitude = 45.0f;
+
+	// Base height for mountains biome
+	UPROPERTY(EditAnywhere, Category = "Terrain | Mountains")
+	float MountainsBaseHeight = 60.0f;
+
+	// Mountains generate if perlin noise produces values from MountainsEdge to 1.
+	UPROPERTY(EditAnywhere, Category = "Terrain | Mountains")
+	float MountainsEdge = 0.60f;
 
 	// Boolean to enable or disable river generation
 	UPROPERTY(EditAnywhere, Category = "Terrain | Rivers")
@@ -94,21 +124,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Terrain | Rivers")
 	float RiverDepth = 15.0f;
 
-	float GetTerrainHeight(float X, float Y) const;
-	float GetDensity(float X, float Y, float Z) const;
-	FBiomeWeights GetBiomeWeights(float X, float Y) const;
-	EBiomeType GetDominantBiome(float X, float Y) const;
-	void InitializeSeed();
-
-protected:
-	
-
-private:	
 	UPROPERTY(EditAnywhere, Category = "Terrain | Seed")
 	bool UseRandomSeed = false;
 
 	UPROPERTY(EditAnywhere, Category = "Terrain | Seed")
-	int Seed;
+	int Seed = 0;
 
 	FORCEINLINE uint32 Hash1D(int32 V) const;
 	FORCEINLINE FVector2D SeededCoords(float X, float Y, int32 Salt) const;

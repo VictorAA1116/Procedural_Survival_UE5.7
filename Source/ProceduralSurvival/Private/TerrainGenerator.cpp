@@ -23,10 +23,6 @@ FBiomeWeights UTerrainGenerator::GetBiomeWeights(float X, float Y) const
 
 	float t = (v + 1.0f) * 0.5f;
 
-	float PlainsEdge = 0.33f;
-	float MountainsEdge = 0.66f;
-	float BlendWidth = 0.1f;
-
 	FBiomeWeights Weights;
 
 	Weights.Plains = 1.0f - FMath::SmoothStep(PlainsEdge - BlendWidth, PlainsEdge + BlendWidth, t);
@@ -69,7 +65,7 @@ float UTerrainGenerator::GetHillsHeight(int X, int Y) const
 		0.3f * FMath::PerlinNoise2D(P * 2.0f) +
 		0.1f * FMath::PerlinNoise2D(P * 4.0f);
 
-	return n * HillsAmplitude + 25.0f;
+	return n * HillsAmplitude + HillsBaseHeight;
 }
 
 float UTerrainGenerator::GetMountainsHeight(int X, int Y) const
@@ -80,10 +76,10 @@ float UTerrainGenerator::GetMountainsHeight(int X, int Y) const
 
 	r *= r;
 
-	float r2 = 1.0f - FMath::Abs(FMath::PerlinNoise2D(P * 2.0f));
+	float r2 = 1.0f - FMath::Abs(FMath::PerlinNoise2D(P * 3.0f));
 	r2 = r2 * r2 * 0.5f;
 
-	float height = (r + r2) * MountainsAmplitude + 40.0f;
+	float height = (r + r2) * MountainsAmplitude + MountainsBaseHeight;
 
 	return height;
 }
@@ -218,8 +214,10 @@ FORCEINLINE FVector2D UTerrainGenerator::SeededCoords(float X, float Y, int32 Sa
 	const uint32 H1 = Hash1D(Salt);
 	const uint32 H2 = Hash1D(Salt ^ 0x9E3779B9);
 
-	const float Ox = ((H1 / (float)UINT32_MAX) * 2.0f - 1.0f) * 100000.0f;
-	const float Oy = ((H2 / (float)UINT32_MAX) * 2.0f - 1.0f) * 100000.0f;
+	constexpr float OffsetScale = 512.0f;
+
+	const float Ox = ((H1 / (float)UINT32_MAX) * 2.0f - 1.0f) * OffsetScale;
+	const float Oy = ((H2 / (float)UINT32_MAX) * 2.0f - 1.0f) * OffsetScale;
 
 	return FVector2D(X + Ox, Y + Oy);
 }
