@@ -27,7 +27,7 @@ void AWorldManager::BeginPlay()
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AWorldManager::StaticClass(), Found);
 	if (Found.Num() > 1)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Multiple WorldManager instances found! There should only be one in the level. Disabling this one to prevent duplicate chunk spawning"));
+		/*UE_LOG(LogTemp, Error, TEXT("Multiple WorldManager instances found! There should only be one in the level. Disabling this one to prevent duplicate chunk spawning"));*/
 		SetActorTickEnabled(false);
 		SetActorHiddenInGame(true);
 		return;
@@ -38,7 +38,7 @@ void AWorldManager::BeginPlay()
 	// Initialize CenterChunk based on player position
 	if (PlayerPawn)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("PlayerPawn start pos: %s"), *PlayerPawn->GetActorLocation().ToString());
+		/*UE_LOG(LogTemp, Warning, TEXT("PlayerPawn start pos: %s"), *PlayerPawn->GetActorLocation().ToString());*/
 		FVector PlayerPos = PlayerPawn->GetActorLocation();
 		FIntVector GV = WorldPosToGlobalVoxel(PlayerPos);
 		CenterChunk.X = FMath::FloorToInt((float)GV.X / ChunkSizeXY);
@@ -195,22 +195,22 @@ void AWorldManager::ProcessChunkGenQueue(float DeltaTime)
 				AWorldChunk* Chunk = GetChunkAt(ChunkXY);
 				if (!Chunk)
 				{
-					UE_LOG(LogTemp, Error,
+					/*UE_LOG(LogTemp, Error,
 						TEXT("[ChunkGen] Missing chunk actor at %d,%d"),
-						ChunkXY.X, ChunkXY.Y);
+						ChunkXY.X, ChunkXY.Y);*/
 					continue;
 				}
 
 				Chunk->isQueuedForVoxelGen = false;
 
-				UE_LOG(LogTemp, Warning,
+				/*UE_LOG(LogTemp, Warning,
 					TEXT("[ChunkGen] POP %d,%d | LOD=%d Phase=%d Vox=%d Built=%d SeamDirty=%d"),
 					ChunkXY.X, ChunkXY.Y,
 					Chunk->GetCurrentLODLevel(),
 					(int32)Chunk->CurrentGenPhase,
 					Chunk->AreVoxelsGenerated() ? 1 : 0,
 					Chunk->isLOD0Built ? 1 : 0,
-					Chunk->isLOD0SeamDirty ? 1 : 0);
+					Chunk->isLOD0SeamDirty ? 1 : 0);*/
 
 				switch (Chunk->CurrentGenPhase)
 				{
@@ -257,7 +257,7 @@ void AWorldManager::ProcessVoxelPhase(AWorldChunk* Chunk, const FIntPoint& Chunk
 		return;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> GeneratedVoxels %d, %d (async)"), ChunkXY.X, ChunkXY.Y);
+	/*UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> GeneratedVoxels %d, %d (async)"), ChunkXY.X, ChunkXY.Y);*/
 
 	Chunk->isVoxelTaskInProgress = true;
 
@@ -376,8 +376,8 @@ void AWorldManager::ProcessMeshLOD0Phase(AWorldChunk* Chunk, const FIntPoint& Ch
 
 	if (needsFirstBuild || needsSeamUpdate)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> GenerateMeshLOD0 %d,%d (First=%d Seam=%d)"),
-			ChunkXY.X, ChunkXY.Y, needsFirstBuild ? 1 : 0, needsSeamUpdate ? 1 : 0);
+		/*UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> GenerateMeshLOD0 %d,%d (First=%d Seam=%d)"),
+			ChunkXY.X, ChunkXY.Y, needsFirstBuild ? 1 : 0, needsSeamUpdate ? 1 : 0);*/
 
 		const bool isBuilt = Chunk->GenerateMeshLOD(0);
 
@@ -386,8 +386,8 @@ void AWorldManager::ProcessMeshLOD0Phase(AWorldChunk* Chunk, const FIntPoint& Ch
 			Chunk->isLOD0Built = true;
 			Chunk->isLOD0SeamDirty = false;
 
-			UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> Mesh done %d,%d (Built=%d SeamDirty=%d)"),
-				ChunkXY.X, ChunkXY.Y, Chunk->isLOD0Built ? 1 : 0, Chunk->isLOD0SeamDirty ? 1 : 0);
+			/*UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> Mesh done %d,%d (Built=%d SeamDirty=%d)"),
+				ChunkXY.X, ChunkXY.Y, Chunk->isLOD0Built ? 1 : 0, Chunk->isLOD0SeamDirty ? 1 : 0);*/
 
 			if (needsFirstBuild)
 			{
@@ -413,9 +413,9 @@ void AWorldManager::ProcessMeshLOD0Phase(AWorldChunk* Chunk, const FIntPoint& Ch
 
 void AWorldManager::CatchUnqueuedChunks(AWorldChunk* Chunk, const FIntPoint& ChunkXY)
 {
-	UE_LOG(LogTemp, Warning,
+	/*UE_LOG(LogTemp, Warning,
 		TEXT("[ChunkGen] DEFAULT phase %d,%d"),
-		ChunkXY.X, ChunkXY.Y);
+		ChunkXY.X, ChunkXY.Y);*/
 
 	if (Chunk->GetCurrentLODLevel() == 0)
 	{
@@ -551,7 +551,7 @@ void AWorldManager::UpdateChunks()
 {
 	if (!ChunkClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("WorldManager: ChunkClass not set!"));
+		/*UE_LOG(LogTemp, Warning, TEXT("WorldManager: ChunkClass not set!"));*/
 		return;
 	}
 
@@ -590,7 +590,7 @@ void AWorldManager::UpdateChunks()
 		DestroyChunkAt(ChunkXY);
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("Active chunks: %d"), ActiveChunks.Num());
+	/*UE_LOG(LogTemp, Warning, TEXT("Active chunks: %d"), ActiveChunks.Num());*/
 }
 
 void AWorldManager::RegisterChunkAt(const FIntPoint& ChunkXY)
@@ -605,7 +605,7 @@ void AWorldManager::RegisterChunkAt(const FIntPoint& ChunkXY)
 
 	if (!FMath::IsFinite(WorldX) || !FMath::IsFinite(WorldY) || FMath::Abs(WorldX) > 1e6f || FMath::Abs(WorldY) > 1e6f)
 	{
-		UE_LOG(LogTemp, Error, TEXT("WorldManager: Invalid spawn location for chunk at {%d,%d}"), ChunkXY.X, ChunkXY.Y);
+		/*UE_LOG(LogTemp, Error, TEXT("WorldManager: Invalid spawn location for chunk at {%d,%d}"), ChunkXY.X, ChunkXY.Y);*/
 		return;
 	}
 
