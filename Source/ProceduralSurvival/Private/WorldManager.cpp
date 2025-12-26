@@ -369,42 +369,93 @@ void AWorldManager::StartAsyncVoxelGen(AWorldChunk* Chunk, const FIntPoint& Chun
 	ActiveVoxelTasks.fetch_sub(1);
 }
 
+void AWorldManager::StartAsyncMeshBuild(AWorldChunk* Chunk, const FIntPoint& ChunkXY, int32 LODLevel, bool MarkNeighborsOnSuccess)
+{
+	if (!Chunk) return;
+
+	TWeakObjectPtr<AWorldChunk> WeakChunk = Chunk;
+	TWeakObjectPtr<AWorldManager> WeakManager = this;
+
+	Async(EAsyncExecution::ThreadPool, [WeakChunk, WeakManager, ChunkXY, LODLevel, MarkNeighborsOnSuccess]() mutable
+	{
+		FChunkMeshBuffers Buffers;
+
+		const bool isBuilt = WeakChunk.IsValid() ? WeakChunk->BuildMeshLODData(LODLevel, Buffers) : false;
+
+		AsyncTask(ENamedThreads::GameThread, [WeakChunk, WeakManager, ChunkXY, LODLevel, isBuilt, MarkNeighborsOnSuccess, Buffers = MoveTemp(Buffers)] () mutable
+		{
+			if (!WeakChunk.IsValid()) return;
+
+			AWorldChunk* StrongChunk = WeakChunk.Get();
+
+			if (!WeakManager.IsValid())
+			{
+				StrongChunk->isMeshTaskInProgress = false;
+				return;
+			}
+
+			AWorldManager* StrongManager = WeakManager.Get();
+
+			if (isBuilt)
+			{
+				StrongChunk->ApplyMeshData(Buffers);
+
+				if (LODLevel == 0)
+				{
+					StrongChunk->isLOD0Built = true;
+					StrongChunk->isLOD0SeamDirty = false;
+
+					if (MarkNeighborsOnSuccess)
+					{
+						StrongManager->MarkLOD0NeighborSeamDirty(ChunkXY);
+					}
+				}
+			}
+			else if (LODLevel == 0)
+			{
+				StrongChunk->isLOD0SeamDirty = true;
+			}
+
+			StrongChunk->isMeshTaskInProgress = false;
+
+			if (LODLevel == 0)
+			{
+				if (!isBuilt && !StrongChunk->isQueuedForVoxelGen)
+				{
+					StrongChunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+					StrongManager->ChunkGenQueue.Add(ChunkXY);
+					StrongChunk->isQueuedForVoxelGen = true;
+				}
+				else
+				{
+					StrongChunk->CurrentGenPhase = EChunkGenPhase::None;
+					StrongChunk->isQueuedForVoxelGen = false;
+				}
+			}
+		});
+	});
+}
+
 void AWorldManager::ProcessMeshLOD0Phase(AWorldChunk* Chunk, const FIntPoint& ChunkXY)
 {
 	const bool needsFirstBuild = !Chunk->isLOD0Built;
 	const bool needsSeamUpdate = Chunk->isLOD0SeamDirty;
 
+	if (Chunk->isMeshTaskInProgress)
+	{
+		if (!Chunk->isQueuedForVoxelGen)
+		{
+			ChunkGenQueue.Add(ChunkXY);
+			Chunk->isQueuedForVoxelGen = true;
+		}
+		return;
+	}
+
 	if (needsFirstBuild || needsSeamUpdate)
 	{
-		/*UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> GenerateMeshLOD0 %d,%d (First=%d Seam=%d)"),
-			ChunkXY.X, ChunkXY.Y, needsFirstBuild ? 1 : 0, needsSeamUpdate ? 1 : 0);*/
-
-		const bool isBuilt = Chunk->GenerateMeshLOD(0);
-
-		if (isBuilt)
-		{
-			Chunk->isLOD0Built = true;
-			Chunk->isLOD0SeamDirty = false;
-
-			/*UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> Mesh done %d,%d (Built=%d SeamDirty=%d)"),
-				ChunkXY.X, ChunkXY.Y, Chunk->isLOD0Built ? 1 : 0, Chunk->isLOD0SeamDirty ? 1 : 0);*/
-
-			if (needsFirstBuild)
-			{
-				MarkLOD0NeighborSeamDirty(ChunkXY);
-			}
-		}
-		else
-		{
-			Chunk->isLOD0SeamDirty = true;
-
-			if (!Chunk->isQueuedForVoxelGen)
-			{
-				Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
-				ChunkGenQueue.Add(ChunkXY);
-				Chunk->isQueuedForVoxelGen = true;
-			}
-		}
+		Chunk->isMeshTaskInProgress = true;
+		StartAsyncMeshBuild(Chunk, ChunkXY, 0, needsFirstBuild);
+		return;
 	}
 
 	Chunk->CurrentGenPhase = EChunkGenPhase::None;
@@ -468,7 +519,14 @@ void AWorldManager::ProcessLODQueue(float DeltaTime)
 
 				if (LOD > 0)
 				{
-					Chunk->GenerateMeshLOD(LOD);
+					if (Chunk->isMeshTaskInProgress)
+					{
+						LODQueue.Add(ChunkXY);
+						continue;
+					}
+
+					Chunk->isMeshTaskInProgress = true;
+					StartAsyncMeshBuild(Chunk, ChunkXY, LOD, false);
 				}
 			}
 		}

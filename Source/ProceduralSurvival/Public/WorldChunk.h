@@ -10,6 +10,15 @@
 class UProceduralMeshComponent;
 class AWorldManager;
 
+struct FChunkMeshBuffers
+{
+    TArray<FVector> Vertices;
+    TArray<int32> Triangles;
+    TArray<FVector> Normals;
+    TArray<FVector2D> UVs;
+    TArray<FColor> VertexColors;
+};
+
 enum class EChunkGenPhase : uint8
 {
     None,
@@ -37,6 +46,10 @@ public:
 
 	bool GenerateMeshLOD(int32 LODLevel);
 
+    bool BuildMeshLODData(int32 LODLevel, FChunkMeshBuffers& OutBuffers);
+
+    void ApplyMeshData(const FChunkMeshBuffers& Buffers);
+
     void ApplyGeneratedVoxels(TArray<FVoxel>&& InVoxels);
 
     FIntPoint GetChunkCoords() const { return ChunkCoords; }
@@ -58,6 +71,7 @@ public:
 	bool isLOD0Built = false;
 	bool isLOD0SeamDirty = false;
     bool isVoxelTaskInProgress = false;
+    bool isMeshTaskInProgress = false;
 
 	EChunkGenPhase CurrentGenPhase = EChunkGenPhase::None;
 
@@ -109,10 +123,10 @@ private:
 
     int LocalIndex(int X, int Y, int Z) const;
 
-    bool GenerateCubicMesh();
-    bool GenerateMarchingCubesMesh();
+    bool BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool ProceduralOnly, FChunkMeshBuffers& OutBuffers);
+    bool BuildMarchingCubeData(int32 LODLevel, int32 LODStep, bool ProceduralOnly, FChunkMeshBuffers& OutBuffers);
 
-    float SampleDensityForMarching(int GlobalX, int GlobalY, int GlobalZ) const;
+    float SampleDensityForMarching(int GlobalX, int GlobalY, int GlobalZ, bool ProceduralOnly) const;
 
     bool VoxelsGenerated = false;
 

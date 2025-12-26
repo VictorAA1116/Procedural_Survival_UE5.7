@@ -155,4 +155,5 @@ private:
 	void CatchUnqueuedChunks(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
 
 	void StartAsyncVoxelGen(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
+	void StartAsyncMeshBuild(AWorldChunk* Chunk, const FIntPoint& ChunkXY, int32 LODLevel, bool MarkNeighborsOnSuccess);
 };
