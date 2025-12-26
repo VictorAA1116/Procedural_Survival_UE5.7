@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "Async/Async.h"
 
 // Sets default values
 AWorldManager::AWorldManager()
@@ -236,17 +237,136 @@ void AWorldManager::ProcessChunkGenQueue(float DeltaTime)
 
 void AWorldManager::ProcessVoxelPhase(AWorldChunk* Chunk, const FIntPoint& ChunkXY)
 {
-	UE_LOG(LogTemp, Warning,
-		TEXT("[ChunkGen] -> GenerateVoxels %d,%d"),
-		ChunkXY.X, ChunkXY.Y);
+	if (ActiveVoxelTasks.load() >= MaxVoxelTasks)
+	{
+		if (!Chunk->isQueuedForVoxelGen)
+		{
+			ChunkGenQueue.Add(ChunkXY);
+			Chunk->isQueuedForVoxelGen = true;
+		}
+		return;
+	}
 
-	Chunk->GenerateVoxels();
-	Chunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+	if (Chunk->isVoxelTaskInProgress)
+	{
+		if (!Chunk->isQueuedForVoxelGen)
+		{
+			ChunkGenQueue.Add(ChunkXY);
+			Chunk->isQueuedForVoxelGen = true;
+		}
+		return;
+	}
 
-	MarkLOD0NeighborSeamDirty(ChunkXY);
+	UE_LOG(LogTemp, Warning, TEXT("[ChunkGen] -> GeneratedVoxels %d, %d (async)"), ChunkXY.X, ChunkXY.Y);
 
-	ChunkGenQueue.Add(ChunkXY);
-	Chunk->isQueuedForVoxelGen = true;
+	Chunk->isVoxelTaskInProgress = true;
+
+	StartAsyncVoxelGen(Chunk, ChunkXY);
+}
+
+void AWorldManager::StartAsyncVoxelGen(AWorldChunk* Chunk, const FIntPoint& ChunkXY)
+{
+	if (!Chunk || !TerrainGenerator)
+	{
+		if (Chunk)
+		{
+			Chunk->isVoxelTaskInProgress = false;
+		}
+		return;
+	}
+
+	ActiveVoxelTasks.fetch_add(1);
+
+	const int32 SizeXY = Chunk->GetChunkSizeXY();
+	const int32 HeightZ = Chunk->GetChunkHeightZ();
+	const int32 BaseX = ChunkXY.X * SizeXY;
+	const int32 BaseY = ChunkXY.Y * SizeXY;
+
+	UTerrainGenerator* TerrainGen = TerrainGenerator;
+	TWeakObjectPtr<AWorldChunk> WeakChunk = Chunk;
+	TWeakObjectPtr<AWorldManager> WeakManager = this;
+
+	Async(EAsyncExecution::ThreadPool, [WeakChunk, WeakManager, TerrainGen, SizeXY, HeightZ, BaseX, BaseY, ChunkXY]() mutable
+	{
+		const bool hasGenerator = (TerrainGen != nullptr);
+		const int32 Total = SizeXY * SizeXY * HeightZ;
+		TArray<FVoxel> GeneratedVoxels;
+		bool isComputed = false;
+
+		if (hasGenerator)
+		{
+			GeneratedVoxels.SetNumZeroed(Total);
+
+			auto LocalIndex = [SizeXY](int X, int Y, int Z)
+				{
+					if (X < 0 || X >= SizeXY || Y < 0 || Y >= SizeXY || Z < 0)
+					{
+						return -1;
+					}
+
+					return X + Y * SizeXY + Z * SizeXY * SizeXY;
+				};
+
+			for (int x = 0; x < SizeXY; x++)
+			{
+				for (int y = 0; y < SizeXY; y++)
+				{
+					const float GX = BaseX + x;
+					const float GY = BaseY + y;
+
+					for (int z = 0; z < HeightZ; z++)
+					{
+						const int32 Index = LocalIndex(x, y, z);
+
+						if (Index < 0) continue;
+
+						const float GZ = z;
+						const float Density = TerrainGen->GetDensity(GX, GY, GZ);
+
+						FVoxel& Voxel = GeneratedVoxels[Index];
+						Voxel.density = Density;
+						Voxel.isSolid = (Density >= 0.0f);
+					}
+				}
+			}
+
+			isComputed = true;
+		}
+		
+
+		AsyncTask(ENamedThreads::GameThread, [WeakChunk, WeakManager, ChunkXY, Voxels = MoveTemp(GeneratedVoxels), isComputed]() mutable
+		{
+			if (!WeakManager.IsValid()) return;
+
+			AWorldManager* StrongManager = WeakManager.Get();
+			StrongManager->ActiveVoxelTasks = FMath::Max(0, StrongManager->ActiveVoxelTasks - 1);
+
+			if (!WeakChunk.IsValid()) return;
+
+			AWorldChunk* StrongChunk = WeakChunk.Get();
+
+			if (isComputed)
+			{
+				StrongChunk->ApplyGeneratedVoxels(MoveTemp(Voxels));
+				StrongChunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
+				StrongChunk->isVoxelTaskInProgress = false;
+
+				StrongManager->MarkLOD0NeighborSeamDirty(ChunkXY);
+
+				if (!StrongChunk->isQueuedForVoxelGen)
+				{
+					StrongManager->ChunkGenQueue.Add(ChunkXY);
+					StrongChunk->isQueuedForVoxelGen = true;
+				}
+			}
+			else
+			{
+				StrongChunk->isVoxelTaskInProgress = false;
+			}
+		});
+	});
+
+	ActiveVoxelTasks.fetch_sub(1);
 }
 
 void AWorldManager::ProcessMeshLOD0Phase(AWorldChunk* Chunk, const FIntPoint& ChunkXY)

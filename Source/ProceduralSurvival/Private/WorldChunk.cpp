@@ -731,6 +731,12 @@ FVector AWorldChunk::VertexInterp(float IsoLevel, const FVector& P1, const FVect
     return P1 + Mu * (P2 - P1);
 }
 
+void AWorldChunk::ApplyGeneratedVoxels(TArray<FVoxel>&& InVoxels)
+{
+    VoxelData = MoveTemp(InVoxels);
+    VoxelsGenerated = true;
+}
+
 float AWorldChunk::SampleDensityForMarching(int GlobalX, int GlobalY, int GlobalZ) const
 {
     if (!WorldManager || !WorldManager->TerrainGenerator) return 1.0f;

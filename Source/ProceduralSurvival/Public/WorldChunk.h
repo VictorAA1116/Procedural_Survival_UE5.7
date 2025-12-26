@@ -37,6 +37,8 @@ public:
 
 	bool GenerateMeshLOD(int32 LODLevel);
 
+    void ApplyGeneratedVoxels(TArray<FVoxel>&& InVoxels);
+
     FIntPoint GetChunkCoords() const { return ChunkCoords; }
     int GetChunkSizeXY() const { return ChunkSizeXY; }
     int GetChunkHeightZ() const { return ChunkHeightZ; }
@@ -55,6 +57,7 @@ public:
     bool useProceduralDensityOnly = false;
 	bool isLOD0Built = false;
 	bool isLOD0SeamDirty = false;
+    bool isVoxelTaskInProgress = false;
 
 	EChunkGenPhase CurrentGenPhase = EChunkGenPhase::None;
 

@@ -5,6 +5,7 @@
 #include "VoxelRenderMode.h"
 #include "TerrainGenerator.h"
 #include "GameFramework/Actor.h"
+#include <atomic>
 #include "WorldManager.generated.h"
 
 UCLASS()
@@ -87,6 +88,12 @@ private:
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	int MaxAllowedChunks = 200;
 
+	// Max num of async voxel generation tasks to keep memory usage stable
+	UPROPERTY(EditAnywhere, Category = "World Generation")
+	int32 MaxVoxelTasks = 2;
+
+	std::atomic<int32> ActiveVoxelTasks = 0;
+
 	// Active chunk map keyed by chunk coordinates
 	UPROPERTY()
 	TMap<FIntPoint, AWorldChunk*> ActiveChunks;
@@ -146,5 +153,6 @@ private:
 	void ProcessVoxelPhase(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
 	void ProcessMeshLOD0Phase(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
 	void CatchUnqueuedChunks(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
-	
+
+	void StartAsyncVoxelGen(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
 };
