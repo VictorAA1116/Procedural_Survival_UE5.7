@@ -26,12 +26,27 @@ void AWorldChunk::InitializeChunk(int InChunkSizeXY, int InChunkHeightZ, float I
     VoxelScale = InVoxelScale;
     ChunkCoords = InChunkCoords;
 
-    const int32 Total = ChunkSizeXY * ChunkSizeXY * ChunkHeightZ;
-    VoxelData.SetNumZeroed(Total);
-
 	isLOD0Built = false;
 	isLOD0SeamDirty = true;
     isInitialized = true;
+}
+
+void AWorldChunk::AllocateVoxelData()
+{
+    const int32 Total = ChunkSizeXY * ChunkSizeXY * ChunkHeightZ;
+
+    if (VoxelData.Num() != Total)
+    {
+        VoxelData.SetNumZeroed(Total);
+    }
+}
+
+void AWorldChunk::ReleaseVoxelData()
+{
+	VoxelData.Empty();
+	VoxelsGenerated = false;
+	isLOD0Built = false;
+	isLOD0SeamDirty = true;
 }
 
 int AWorldChunk::LocalIndex(int X, int Y, int Z) const
@@ -48,10 +63,10 @@ bool AWorldChunk::IsVoxelSolidLocal(int LocalX, int LocalY, int LocalZ) const
 {
     if (LocalX < 0 || LocalX >= ChunkSizeXY || LocalY < 0 || LocalY >= ChunkSizeXY || LocalZ < 0 || LocalZ >= ChunkHeightZ) return false;
 
-    if (!isInitialized) return false;
+    if (!isInitialized || !VoxelsGenerated) return false;
 
     int Index = LocalIndex(LocalX, LocalY, LocalZ);
-    if (Index < 0) return false;
+    if (Index < 0 || !VoxelData.IsValidIndex(Index)) return false;
 
     return VoxelData[Index].isSolid;
 }
@@ -60,10 +75,14 @@ void AWorldChunk::SetVoxelLocal(int LocalX, int LocalY, int LocalZ, bool isSolid
 {
     if (!isInitialized) return;
 
+	AllocateVoxelData();
+
     int Index = LocalIndex(LocalX, LocalY, LocalZ);
-    if (Index < 0) return;
+    if (Index < 0 || !VoxelData.IsValidIndex(Index)) return;
     VoxelData[Index].isSolid = isSolid;
     VoxelData[Index].density = isSolid ? 1.0f : -1.0f;
+
+	VoxelsGenerated = true;
 
     GenerateMeshLOD(WorldManager->ComputeLODForChunk(ChunkCoords));
 }
@@ -73,6 +92,8 @@ void AWorldChunk::GenerateVoxels()
     if (!isInitialized || !WorldManager || !WorldManager->TerrainGenerator) return;
 
 	UTerrainGenerator* TerrainGen = WorldManager->TerrainGenerator;
+
+    AllocateVoxelData();
 
 	const int32 BaseX = ChunkCoords.X * ChunkSizeXY;
 	const int32 BaseY = ChunkCoords.Y * ChunkSizeXY;
@@ -773,8 +794,10 @@ float AWorldChunk::GetVoxelDensity(const FIntVector& LocalXYZ) const
 {
     if (!isInitialized) return 1.0f;
 
-     const int Index = LocalIndex(LocalXYZ.X, LocalXYZ.Y, LocalXYZ.Z);
-    if (Index < 0) return -1.0f;
+    if (VoxelData.Num() == 0) return -1.0f;
+
+    const int Index = LocalIndex(LocalXYZ.X, LocalXYZ.Y, LocalXYZ.Z);
+    if (Index < 0 || !VoxelData.IsValidIndex(Index)) return -1.0f;
 
     return VoxelData[Index].density;
 }
@@ -819,7 +842,9 @@ void AWorldChunk::ApplyMeshData(const FChunkMeshBuffers& Buffers)
 	if (!Mesh) return;
 
 	Mesh->ClearAllMeshSections();
-	Mesh->CreateMeshSection(0, Buffers.Vertices, Buffers.Triangles, Buffers.Normals, Buffers.UVs, Buffers.VertexColors, {}, true);
+    const bool EnableCollision = (CurrentLODLevel == 0);
+	Mesh->CreateMeshSection(0, Buffers.Vertices, Buffers.Triangles, Buffers.Normals, Buffers.UVs, Buffers.VertexColors, {}, EnableCollision);
+	Mesh->SetCollisionEnabled(EnableCollision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 
     if (BiomeDebugMaterial)
     {

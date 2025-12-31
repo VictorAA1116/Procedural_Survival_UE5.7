@@ -52,6 +52,9 @@ public:
 
     void ApplyGeneratedVoxels(TArray<FVoxel>&& InVoxels);
 
+    void AllocateVoxelData();
+    void ReleaseVoxelData();
+
     FIntPoint GetChunkCoords() const { return ChunkCoords; }
     int GetChunkSizeXY() const { return ChunkSizeXY; }
     int GetChunkHeightZ() const { return ChunkHeightZ; }

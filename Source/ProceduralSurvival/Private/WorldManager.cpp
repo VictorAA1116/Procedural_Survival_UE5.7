@@ -107,6 +107,11 @@ void AWorldManager::ProcessLODUpdates(TArray<FIntPoint> ActiveChunkKeys)
 				MarkChunkAndNeighborsDirty(ChunkXY);
 			}
 
+			if (DesiredLOD > 0 && Chunk->AreVoxelsGenerated())
+			{
+				Chunk->ReleaseVoxelData();
+			}
+
 			if (DesiredLOD == 0)
 			{
 				if (!Chunk->AreVoxelsGenerated())
@@ -690,6 +695,10 @@ void AWorldManager::RegisterChunkAt(const FIntPoint& ChunkXY)
 		}
 		else
 		{
+			if (NewChunk->AreVoxelsGenerated())
+			{
+				NewChunk->ReleaseVoxelData();
+			}
 			EnqueueLODMeshBuild(ChunkXY, DesiredLOD);
 		}
 	}
@@ -772,6 +781,10 @@ void AWorldManager::RegenerateChunk(const FIntPoint& Center, int32 OldLOD, int32
 		}
 		else
 		{
+			if (Chunk->AreVoxelsGenerated())
+			{
+				Chunk->ReleaseVoxelData();
+			}
 			EnqueueLODMeshBuild(ChunkXY, DesiredLOD);
 		}
 	}
