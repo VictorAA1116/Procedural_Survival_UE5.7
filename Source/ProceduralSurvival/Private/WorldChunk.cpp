@@ -43,10 +43,26 @@ void AWorldChunk::AllocateVoxelData()
 
 void AWorldChunk::ReleaseVoxelData()
 {
+    if (isMeshTaskInProgress || isVoxelTaskInProgress)
+    {
+        pendingVoxelRelease = true;
+        return;
+    }
+
 	VoxelData.Empty();
 	VoxelsGenerated = false;
 	isLOD0Built = false;
 	isLOD0SeamDirty = true;
+}
+
+void AWorldChunk::MaybeReleaseVoxelData()
+{
+    if (!pendingVoxelRelease || isMeshTaskInProgress || isVoxelTaskInProgress || CurrentLODLevel == 0)
+    {
+        return;
+	}
+
+    ReleaseVoxelData();
 }
 
 int AWorldChunk::LocalIndex(int X, int Y, int Z) const

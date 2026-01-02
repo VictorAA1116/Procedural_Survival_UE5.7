@@ -355,6 +355,7 @@ void AWorldManager::StartAsyncVoxelGen(AWorldChunk* Chunk, const FIntPoint& Chun
 				StrongChunk->ApplyGeneratedVoxels(MoveTemp(Voxels));
 				StrongChunk->CurrentGenPhase = EChunkGenPhase::MeshLOD0;
 				StrongChunk->isVoxelTaskInProgress = false;
+				StrongChunk->MaybeReleaseVoxelData();
 
 				StrongManager->MarkLOD0NeighborSeamDirty(ChunkXY);
 
@@ -367,6 +368,7 @@ void AWorldManager::StartAsyncVoxelGen(AWorldChunk* Chunk, const FIntPoint& Chun
 			else
 			{
 				StrongChunk->isVoxelTaskInProgress = false;
+				StrongChunk->MaybeReleaseVoxelData();
 			}
 		});
 	});
@@ -422,6 +424,7 @@ void AWorldManager::StartAsyncMeshBuild(AWorldChunk* Chunk, const FIntPoint& Chu
 			}
 
 			StrongChunk->isMeshTaskInProgress = false;
+			StrongChunk->MaybeReleaseVoxelData();
 
 			if (LODLevel == 0)
 			{
@@ -520,16 +523,19 @@ void AWorldManager::ProcessLODQueue(float DeltaTime)
 				if (!DesiredLODPtr) continue;
 
 				const int32 LOD = *DesiredLODPtr;
-				PendingLOD.Remove(ChunkXY);
 
 				if (LOD > 0)
 				{
 					if (Chunk->isMeshTaskInProgress)
 					{
-						LODQueue.Add(ChunkXY);
+						if (!LODQueue.Contains(ChunkXY))
+						{
+							LODQueue.Add(ChunkXY);
+						}
 						continue;
 					}
 
+					PendingLOD.Remove(ChunkXY);
 					Chunk->isMeshTaskInProgress = true;
 					StartAsyncMeshBuild(Chunk, ChunkXY, LOD, false);
 				}
@@ -603,7 +609,13 @@ bool AWorldManager::IsVoxelSolidGlobal(int GlobalVoxelX, int GlobalVoxelY, int G
 
 	const AWorldChunk* Chunk = *ChunkPtr;
 
-	if (!Chunk->AreVoxelsGenerated()) return true;
+	if (!Chunk->AreVoxelsGenerated())
+	{
+		if (!TerrainGenerator) return true;
+
+		const float Density = TerrainGenerator->GetDensity(GlobalVoxelX, GlobalVoxelY, GlobalVoxelZ);
+		return (Density >= 0.0f);
+	}
 
 	if (LocalXYZ.Z < 0 || LocalXYZ.Z >= Chunk->GetChunkHeightZ()) return true;
 
@@ -810,10 +822,14 @@ bool AWorldManager::AreAllNeighborChunksVoxelReady(const FIntPoint& ChunkXY) con
 		if (!IsNeighborChunkLoaded(NeighborXY)) return false;
 
 		AWorldChunk* const* NeighborPtr = ActiveChunks.Find(NeighborXY);
-		if (!NeighborPtr || !(*NeighborPtr) || !(*NeighborPtr)->AreVoxelsGenerated())
-		{
-			return false;
-		}
+		if (!NeighborPtr || !(*NeighborPtr)) return false;
+
+		AWorldChunk* NeighborChunk = *NeighborPtr;
+
+		const bool neighborHasVoxels = NeighborChunk->AreVoxelsGenerated();
+		const bool neigborIsProcedural = (NeighborChunk->GetCurrentLODLevel() > 0);
+
+		if (!neigborIsProcedural && !neighborHasVoxels) return false;
 	}
 	return true;
 }

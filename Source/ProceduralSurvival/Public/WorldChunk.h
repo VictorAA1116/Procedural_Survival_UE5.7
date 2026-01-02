@@ -54,6 +54,7 @@ public:
 
     void AllocateVoxelData();
     void ReleaseVoxelData();
+	void MaybeReleaseVoxelData();
 
     FIntPoint GetChunkCoords() const { return ChunkCoords; }
     int GetChunkSizeXY() const { return ChunkSizeXY; }
@@ -115,6 +116,8 @@ private:
     float VoxelScale = 100.0f;
 
     TArray<FVoxel> VoxelData;
+
+    bool pendingVoxelRelease = false;
 
 	// Rendering mode for this chunk
     UPROPERTY()
