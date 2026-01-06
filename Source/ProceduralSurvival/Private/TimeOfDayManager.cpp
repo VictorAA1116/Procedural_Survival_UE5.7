@@ -51,9 +51,11 @@ void ATimeOfDayManager::UpdateSunAndMoon()
 	const float DayAlpha = FMath::Fmod(TimeOfDayHours / 24.0f, 1.0f);
 	const float SunPitch = DayAlpha * 360.0f - 90.0f;
 
-	const float Elevation01 = FMath::Clamp(FMath::Sin(FMath::DegreesToRadians(SunPitch)), 0.0f, 1.0f);
-	const float DayLightFactor = SmoothStep(0.0f, FMath::Sin(FMath::DegreesToRadians(TwilightDegrees)), Elevation01);
-	const float NightLightFactor = 1.0f - DayLightFactor;
+	const float Elevation = FMath::Sin(FMath::DegreesToRadians(SunPitch));
+	const float TwilightThreshold = FMath::Sin(FMath::DegreesToRadians(TwilightDegrees));
+	const float NightLightFactor = SmoothStep(-TwilightThreshold, TwilightThreshold, Elevation);
+
+	const float DayLightFactor = 1.0f - NightLightFactor;
 
 	if (SunLight)
 	{

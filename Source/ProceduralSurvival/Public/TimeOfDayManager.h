@@ -42,10 +42,10 @@ public:
 
 	// Appearance Tuning
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay | Appearance")
-	float SunMaxIntensityLux = 100000.0f;
+	float SunMaxIntensityLux = 10.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay | Appearance")
-	float MoonMaxIntensityLux = 0.25f;
+	float MoonMaxIntensityLux = 10.0f;
 
 	// Controls how soft the transition is around sunrise/sunset (in degrees)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay | Appearance")
