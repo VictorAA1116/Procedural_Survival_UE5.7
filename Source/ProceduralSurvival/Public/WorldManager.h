@@ -154,6 +154,8 @@ private:
 	void ProcessMeshLOD0Phase(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
 	void CatchUnqueuedChunks(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
 
+	bool HasPendingLOD0Work() const;
+
 	void StartAsyncVoxelGen(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
 	void StartAsyncMeshBuild(AWorldChunk* Chunk, const FIntPoint& ChunkXY, int32 LODLevel, bool MarkNeighborsOnSuccess);
 };

@@ -489,8 +489,33 @@ void AWorldManager::CatchUnqueuedChunks(AWorldChunk* Chunk, const FIntPoint& Chu
 	}
 }
 
+bool AWorldManager::HasPendingLOD0Work() const
+{
+	if (ChunkGenQueue.Num() > 0)
+	{
+		return true;
+	}
+
+	for (const TPair<FIntPoint, AWorldChunk*>& Pair : ActiveChunks)
+	{
+		AWorldChunk* Chunk = Pair.Value;
+		if (!Chunk) continue;
+		if (Chunk->GetCurrentLODLevel() != 0) continue;
+		if (!Chunk->AreVoxelsGenerated() || !Chunk->isLOD0Built || Chunk->isLOD0SeamDirty || Chunk->isMeshTaskInProgress || Chunk->isVoxelTaskInProgress)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void AWorldManager::ProcessLODQueue(float DeltaTime)
 {
+	if (HasPendingLOD0Work())
+	{
+		//return;
+	}
+
 	// Process LOD mesh build queue
 	if (LODQueue.Num() > 0)
 	{
@@ -818,6 +843,8 @@ bool AWorldManager::AreAllNeighborChunksVoxelReady(const FIntPoint& ChunkXY) con
 	for (const FIntPoint& Offset : Neighbors)
 	{
 		const FIntPoint NeighborXY = ChunkXY + Offset;
+
+		if (!IsChunkWithinRenderDistance(NeighborXY)) continue;
 
 		if (!IsNeighborChunkLoaded(NeighborXY)) return false;
 
