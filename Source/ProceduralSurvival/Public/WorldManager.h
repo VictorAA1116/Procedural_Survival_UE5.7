@@ -5,6 +5,7 @@
 #include "VoxelRenderMode.h"
 #include "TerrainGenerator.h"
 #include "GameFramework/Actor.h"
+#include <atomic>
 #include "WorldManager.generated.h"
 
 UCLASS()
@@ -30,9 +31,30 @@ public:
 
 	bool IsChunkWithinRenderDistance(const FIntPoint& ChunkXY) const;
 
+	bool IsNeighborChunkLoaded(const FIntPoint& NChunkXY) const;
+
+	bool AreAllNeighborChunksVoxelReady(const FIntPoint& ChunkXY) const;
+
+	AWorldChunk* GetChunkAt(const FIntPoint& ChunkXY) const;
+
+	int32 ComputeLODForChunk(const FIntPoint& ChunkXY) const;
+
+	void EnqueueInitialLODs();
+
+	void EnqueueLODMeshBuild(const FIntPoint& ChunkXY, int32 LOD);
+
+	UFUNCTION(BlueprintCallable)
+	bool RemoveVoxel(const FVector& VoxelLocation);
+
+	UFUNCTION(BlueprintCallable)
+	bool AddVoxel(const FVector& VoxelLocation);
+
+	// Voxel rendering mode (Cubes or Marching Cubes)
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	EVoxelRenderMode RenderMode = EVoxelRenderMode::Cubes;
 
+
+	// Terrain generator instance reference
 	UPROPERTY(EditAnywhere, Instanced, Category = "Terrain")
 	UTerrainGenerator* TerrainGenerator;
 
@@ -62,8 +84,15 @@ protected:
 
 private:
 
+	// Maximum allowed active chunks before unloading the farthest ones
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	int MaxAllowedChunks = 200;
+
+	// Max num of async voxel generation tasks to keep memory usage stable
+	UPROPERTY(EditAnywhere, Category = "World Generation")
+	int32 MaxVoxelTasks = 2;
+
+	std::atomic<int32> ActiveVoxelTasks = 0;
 
 	// Active chunk map keyed by chunk coordinates
 	UPROPERTY()
@@ -75,17 +104,58 @@ private:
 
 	TArray<FIntPoint> ChunkGenQueue;
 
+	// Chunk generation rate in chunks per second (60 = 1 chunk per frame at 60 FPS)
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	float ChunkGenRate = 60.0f; // chunks per second
 
 	float ChunkGenAccumulator = 0.0f;
 
+	// Maximum LOD level (0 = highest detail, no LODs and lower performance)
+	UPROPERTY(EditAnywhere, Category = "LOD")
+	int32 MaxLODLevel = 4;
+
+	// Render distance for LOD0 (highest detail) in chunks
+	UPROPERTY(EditAnywhere, Category = "LOD")
+	int32 LOD0RenderDistance = 6;
+
+	// Multiplier for LOD distances (e.g., 2 means each higher LOD has double the distance of the previous)
+	UPROPERTY(EditAnywhere, Category = "LOD")
+	int32 LODStepMultiplier = 2;
+
 	// Current center chunk coordinates based on player position
 	FIntPoint CenterChunk = FIntPoint::ZeroValue;
+
+	TArray<FIntPoint> LODQueue;
+	TMap<FIntPoint, int32> PendingLOD;
+
+	float LODBuildAccumulator = 0.0f;
+
+	// LOD build rate in LOD builds per second (60 = 1 LOD build per frame at 60 FPS)
+	UPROPERTY(EditAnywhere, Category = "LOD")
+	float LODBuildRate = 30.0f; // LOD builds per second
 
 	void UpdateChunks();
 	void RegisterChunkAt(const FIntPoint& ChunkXY);
 	void DestroyChunkAt(const FIntPoint& ChunkXY);
-	void OnChunkCreated(const FIntPoint& ChunkXY);
+	void RegenerateChunk(const FIntPoint& Center, int32 OldLOD, int32 NewLOD);
 	void SortChunkQueueByDistance();
+	void SortLODQueueByDistance();
+	void MarkLOD0Dirty(const FIntPoint& ChunkXY);
+	void MarkChunkAndNeighborsDirty(const FIntPoint& Center);
+	void MarkLOD0NeighborSeamDirty(const FIntPoint& Center);
+
+	void UpdateCenterChunk();
+	void ProcessLODUpdates(TArray <FIntPoint> ActiveChunkKeys);
+	void LOD0SafetyNet(TArray <FIntPoint> ActiveChunkKeys);
+	void ProcessChunkGenQueue(float DeltaTime);
+	void ProcessLODQueue(float DeltaTime);
+	
+	void ProcessVoxelPhase(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
+	void ProcessMeshLOD0Phase(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
+	void CatchUnqueuedChunks(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
+
+	bool HasPendingLOD0Work() const;
+
+	void StartAsyncVoxelGen(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
+	void StartAsyncMeshBuild(AWorldChunk* Chunk, const FIntPoint& ChunkXY, int32 LODLevel, bool MarkNeighborsOnSuccess);
 };

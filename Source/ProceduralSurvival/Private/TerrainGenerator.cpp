@@ -3,23 +3,25 @@
 
 #include "TerrainGenerator.h"
 
+static constexpr int32 SEED_CONTINENTS = 1337;
+static constexpr int32 SEED_BIOMES = 7331;
+static constexpr int32 SEED_PLAINS = 9001;
+static constexpr int32 SEED_HILLS = 4242;
+static constexpr int32 SEED_MOUNTAINS = 6666;
+static constexpr int32 SEED_RIVERS = 12345;
+static constexpr int32 SEED_SURFACE = 8888;
+
 FBiomeWeights UTerrainGenerator::GetBiomeWeights(float X, float Y) const
 {
-	float bx = X / BiomeScale;
-	float by = Y / BiomeScale;
+	const FVector2D P = SeededCoords(X / BiomeScale, Y / BiomeScale, Seed + SEED_BIOMES);
 
-	float warp = FMath::PerlinNoise2D(FVector2D(bx * 0.5f, by * 0.5f)) * 0.15f;
+	float warp = FMath::PerlinNoise2D(P * 0.5f) * 0.15f;
 
-	bx += warp;
-	by += warp;
+	const FVector2D Pw = FVector2D(P.X + warp, P.Y + warp);
 	
-	float v = FMath::PerlinNoise2D(FVector2D(bx, by));
+	float v = FMath::PerlinNoise2D(Pw);
 
 	float t = (v + 1.0f) * 0.5f;
-
-	float PlainsEdge = 0.33f;
-	float MountainsEdge = 0.66f;
-	float BlendWidth = 0.1f;
 
 	FBiomeWeights Weights;
 
@@ -45,42 +47,39 @@ FBiomeWeights UTerrainGenerator::GetBiomeWeights(float X, float Y) const
 
 float UTerrainGenerator::GetPlainsHeight(int X, int Y) const
 {
-	float nx = X * PlainsFrequency;
-	float ny = Y * PlainsFrequency;
+	const FVector2D P = SeededCoords(X * PlainsFrequency, Y * PlainsFrequency, Seed + SEED_PLAINS);
 
 	float n = 
-		0.7f * FMath::PerlinNoise2D(FVector2D(nx, ny)) +
-		0.2f * FMath::PerlinNoise2D(FVector2D(2 * nx, 2 * ny));
+		0.7f * FMath::PerlinNoise2D(P) +
+		0.2f * FMath::PerlinNoise2D(P * 2.0f);
 
 	return n * PlainsAmplitude + PlainsBaseHeight;
 }
 
 float UTerrainGenerator::GetHillsHeight(int X, int Y) const
 {
-	float nx = X * HillsFrequency;
-	float ny = Y * HillsFrequency;
+	const FVector2D P = SeededCoords(X * HillsFrequency, Y * HillsFrequency, Seed + SEED_HILLS);
 
 	float n = 
-		0.6f * FMath::PerlinNoise2D(FVector2D(nx, ny)) +
-		0.3f * FMath::PerlinNoise2D(FVector2D(2 * nx, 2 * ny)) +
-		0.1f * FMath::PerlinNoise2D(FVector2D(4 * nx, 4 * ny));
+		0.6f * FMath::PerlinNoise2D(P) +
+		0.3f * FMath::PerlinNoise2D(P * 2.0f) +
+		0.1f * FMath::PerlinNoise2D(P * 4.0f);
 
-	return n * HillsAmplitude + 25.0f;
+	return n * HillsAmplitude + HillsBaseHeight;
 }
 
 float UTerrainGenerator::GetMountainsHeight(int X, int Y) const
 {
-	float nx = X * MountainsFrequency;
-	float ny = Y * MountainsFrequency;
+	const FVector2D P = SeededCoords(X * MountainsFrequency, Y * MountainsFrequency, Seed + SEED_MOUNTAINS);
 
-	float r = 1.0f - FMath::Abs(FMath::PerlinNoise2D(FVector2D(nx, ny)));
+	float r = 1.0f - FMath::Abs(FMath::PerlinNoise2D(P));
 
-	r = r * r;
+	r *= r;
 
-	float r2 = 1.0f - FMath::Abs(FMath::PerlinNoise2D(FVector2D(2 * nx, 2 * ny)));
+	float r2 = 1.0f - FMath::Abs(FMath::PerlinNoise2D(P * 3.0f));
 	r2 = r2 * r2 * 0.5f;
 
-	float height = (r + r2) * MountainsAmplitude + 40.0f;
+	float height = (r + r2) * MountainsAmplitude + MountainsBaseHeight;
 
 	return height;
 }
@@ -89,14 +88,15 @@ float UTerrainGenerator::ApplyRivers(float X, float Y, float Height) const
 {
 	if (!EnableRivers) return Height;
 
-	float RiverValue = FMath::Abs(FMath::PerlinNoise2D(FVector2D(X, Y) * RiverFrequency));
+	const FVector2D P = SeededCoords(X * RiverFrequency, Y * RiverFrequency, Seed + SEED_RIVERS);
+
+	float RiverValue = FMath::Abs(FMath::PerlinNoise2D(P));
 
 	if (RiverValue < RiverWidth)
 	{
 		float t = 1.0f - (RiverValue / RiverWidth);
 
-		t = t * t;
-		t = FMath::SmoothStep(0.0f, 1.0f, t);
+		t = FMath::SmoothStep(0.0f, 1.0f, t * t);
 
 		Height -= t * RiverDepth;
 	}
@@ -129,7 +129,9 @@ void UTerrainGenerator::PickDominantBiomes(const FBiomeWeights& Weights, EBiomeT
 
 float UTerrainGenerator::GetTerrainHeight(float X, float Y) const
 {
-	float continents = FMath::PerlinNoise2D(FVector2D(X, Y) * ContinentFrequency);
+	const FVector2D P = SeededCoords(X * ContinentFrequency, Y * ContinentFrequency, Seed + SEED_CONTINENTS);
+
+	float continents = FMath::PerlinNoise2D(P);
 	continents = continents * ContinentAmplitude + ContinentBaseHeight;
 
 	FBiomeWeights Weight = GetBiomeWeights(X, Y);
@@ -164,7 +166,7 @@ float UTerrainGenerator::GetTerrainHeight(float X, float Y) const
 
 	Height = ApplyRivers(X, Y, Height);
 
-	float surfaceNoise = FMath::PerlinNoise2D(FVector2D(X, Y) * 0.1f) * SurfaceNoiseAmplitude;
+	float surfaceNoise = FMath::PerlinNoise2D(SeededCoords(X * 0.1f, Y * 0.1f, Seed + SEED_SURFACE)) * SurfaceNoiseAmplitude;
 	Height += surfaceNoise;
 	
 	return Height;
@@ -188,3 +190,34 @@ EBiomeType UTerrainGenerator::GetDominantBiome(float X, float Y) const
 	return PrimaryBiome;
 }
 
+void UTerrainGenerator::InitializeSeed()
+{
+	if (UseRandomSeed)
+	{
+		Seed = FMath::Rand();
+	}
+}
+
+FORCEINLINE uint32 UTerrainGenerator::Hash1D(int32 V) const
+{
+	uint32 X = (uint32)V;
+	X ^= X >> 16;
+	X *= 0x7feb352d;
+	X ^= X >> 15;
+	X *= 0x846ca68b;
+	X ^= X >> 16;
+	return X;
+}
+
+FORCEINLINE FVector2D UTerrainGenerator::SeededCoords(float X, float Y, int32 Salt) const
+{
+	const uint32 H1 = Hash1D(Salt);
+	const uint32 H2 = Hash1D(Salt ^ 0x9E3779B9);
+
+	constexpr float OffsetScale = 512.0f;
+
+	const float Ox = ((H1 / (float)UINT32_MAX) * 2.0f - 1.0f) * OffsetScale;
+	const float Oy = ((H2 / (float)UINT32_MAX) * 2.0f - 1.0f) * OffsetScale;
+
+	return FVector2D(X + Ox, Y + Oy);
+}
