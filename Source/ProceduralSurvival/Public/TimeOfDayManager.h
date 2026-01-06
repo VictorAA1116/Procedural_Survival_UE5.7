@@ -20,13 +20,25 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	// In-game time in hours (0.0 - 24.0)
+	// Current in-game time in hours
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay")
-	float TimeOfDayHours = 12.0f;
+	float CurrentTime = 0.0f;
+
+	// Time to start at when the game begins (in hours)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay")
+	float StartTime = 6.0f;
+
+	// Length of a full day in hours
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay")
+	float DayLength = 24.0f;
+
+	// UI-readable representation of the in game time
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay")
+	FTimespan TimeOfDay;
 
 	// How many in-game minutes pass per real-time second
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay")
-	float TimeScale = 10.0f;
+	float TimeScale = 0.5f;
 
 	// Bool to control whether time progresses
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay")
@@ -42,24 +54,33 @@ public:
 
 	// Appearance Tuning
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay | Appearance")
-	float SunMaxIntensityLux = 10.0f;
+	float SunMaxIntensityLux = 6.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay | Appearance")
-	float MoonMaxIntensityLux = 10.0f;
+	float MoonMaxIntensityLux = 5.0f;
 
 	// Controls how soft the transition is around sunrise/sunset (in degrees)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay | Appearance")
-	float TwilightDegrees = 6.0f;
+	float TwilightDegrees = 1.0f;
 
-	// Direction of sunrise on yaw axis
+	// Direction of sunrise on roll axis
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "TimeOfDay | Appearance")
-	float SunYawDegrees = 0.0f;
+	float SunRollDegrees = 30.0f;
+	
+	// Sets the in-game time immediately
+	UFUNCTION(BlueprintCallable, Category = "TimeOfDay")
+	void SetTime(float NewTimeInHours);
+
+	// Returns the current in-game time as a formatted string for UI Use
+	UFUNCTION(BlueprintCallable, Category = "TimeOfDay")
+	FString GetTime(bool Use24HFormat = true, bool IncludeSeconds = true) const;
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-private:	
+private:
+	void UpdateTime();
 	void UpdateSunAndMoon();
 	static float SmoothStep(float Edge0, float Edge1, float X);
 };
