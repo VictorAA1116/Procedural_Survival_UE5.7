@@ -37,6 +37,7 @@ void ATimeOfDayManager::Tick(float DeltaTime)
 			CurrentTime += DayLength;
 		}
 
+		UpdateTime();
 		UpdateSunAndMoon();
 	}
 }
@@ -129,4 +130,3 @@ FString ATimeOfDayManager::GetTime(bool Use24HFormat, bool IncludeSeconds) const
 
 	return TimeString;
 }
-
