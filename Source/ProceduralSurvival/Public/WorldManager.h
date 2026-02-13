@@ -17,6 +17,8 @@ public:
 	// Sets default values for this actor's properties
 	AWorldManager();
 
+	virtual bool ShouldTickIfViewportsOnly() const override;
+
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
@@ -53,6 +55,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	EVoxelRenderMode RenderMode = EVoxelRenderMode::Cubes;
 
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(EditAnywhere, Category = "World Generation | Editor View")
+	bool bAutoGenerateInEditor = false;
+#endif
 
 	// Terrain generator instance reference
 	UPROPERTY(EditAnywhere, Instanced, Category = "Terrain")
@@ -61,6 +67,16 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+	virtual void OnConstruction(const FTransform& Transform) override;
+
+#if WITH_EDITOR
+	UFUNCTION(CallInEditor, Category = "World Generation | Editor View")
+	void GenerateWorldInEditor();
+
+	UFUNCTION(CallInEditor, Category = "World Generation | Editor View")
+	void ClearWorldInEditor();
+#endif
 
 	// Size of chunks in voxels on the X and Y axis
 	UPROPERTY(EditAnywhere, Category = "World Generation")
@@ -103,12 +119,18 @@ private:
 	APawn* PlayerPawn = nullptr;
 
 	TArray<FIntPoint> ChunkGenQueue;
+	TArray<FIntPoint> ChunkRegisterQueue;
 
 	// Chunk generation rate in chunks per second (60 = 1 chunk per frame at 60 FPS)
 	UPROPERTY(EditAnywhere, Category = "World Generation")
 	float ChunkGenRate = 60.0f; // chunks per second
 
 	float ChunkGenAccumulator = 0.0f;
+
+	UPROPERTY(EditAnywhere, Category = "World Generation")
+	float ChunkRegisterRate = 60.0f;
+
+	float SpawnAccumulator = 0.0f;
 
 	// Maximum LOD level (0 = highest detail, no LODs and lower performance)
 	UPROPERTY(EditAnywhere, Category = "LOD")
@@ -140,6 +162,7 @@ private:
 	void RegenerateChunk(const FIntPoint& Center, int32 OldLOD, int32 NewLOD);
 	void SortChunkQueueByDistance();
 	void SortLODQueueByDistance();
+	void SortRegisterQueueByDistance();
 	void MarkLOD0Dirty(const FIntPoint& ChunkXY);
 	void MarkChunkAndNeighborsDirty(const FIntPoint& Center);
 	void MarkLOD0NeighborSeamDirty(const FIntPoint& Center);
@@ -149,10 +172,14 @@ private:
 	void LOD0SafetyNet(TArray <FIntPoint> ActiveChunkKeys);
 	void ProcessChunkGenQueue(float DeltaTime);
 	void ProcessLODQueue(float DeltaTime);
+	void ProcessChunkRegisterQueue(float DeltaTime);
 	
 	void ProcessVoxelPhase(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
 	void ProcessMeshLOD0Phase(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
 	void CatchUnqueuedChunks(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
+
+	void ResetGenerationState(bool DestroyChunkActors);
+	void SetCenterChunkFromWorldLocation(const FVector& WorldLocation);
 
 	bool HasPendingLOD0Work() const;
 

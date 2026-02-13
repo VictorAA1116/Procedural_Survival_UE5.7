@@ -16,10 +16,37 @@ AWorldManager::AWorldManager()
 	TerrainGenerator = CreateDefaultSubobject<UTerrainGenerator>(TEXT("TerrainGenerator"));
 }
 
+bool AWorldManager::ShouldTickIfViewportsOnly() const
+{
+#if WITH_EDITOR
+	return bAutoGenerateInEditor;
+#else
+	return false;
+#endif
+}
+
+void AWorldManager::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+#if WITH_EDITOR
+	if (!GetWorld() || GetWorld()->IsGameWorld())
+	{
+		return;
+	}
+
+	if (bAutoGenerateInEditor)
+	{
+		GenerateWorldInEditor();
+	}
+#endif
+}
+
 // Called when the game starts or when spawned
 void AWorldManager::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (!TerrainGenerator) return;
 
 	TerrainGenerator->InitializeSeed();
 
@@ -49,10 +76,33 @@ void AWorldManager::BeginPlay()
 	EnqueueInitialLODs();
 }
 
+#if WITH_EDITOR
+void AWorldManager::GenerateWorldInEditor()
+{
+	if (!GetWorld() || GetWorld()->IsGameWorld() || !TerrainGenerator) return;
+
+	TerrainGenerator->InitializeSeed();
+	ResetGenerationState(true);
+	SetCenterChunkFromWorldLocation(GetActorLocation());
+	UpdateChunks();
+	EnqueueInitialLODs();
+}
+
+void AWorldManager::ClearWorldInEditor()
+{
+	if (!GetWorld() || GetWorld()->IsGameWorld()) return;
+	ResetGenerationState(true);
+}
+#endif
+
 // Called every frame
 void AWorldManager::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+#if WITH_EDITOR
+	if (GetWorld() && !GetWorld()->IsGameWorld() && !bAutoGenerateInEditor) return;
+#endif
 
 	UpdateCenterChunk();
 
@@ -65,7 +115,35 @@ void AWorldManager::Tick(float DeltaTime)
 
 	ProcessChunkGenQueue(DeltaTime);
 
+	ProcessChunkRegisterQueue(DeltaTime);
+
 	ProcessLODQueue(DeltaTime);
+}
+
+void AWorldManager::SetCenterChunkFromWorldLocation(const FVector& WorldLocation)
+{
+	FIntVector GV = WorldPosToGlobalVoxel(WorldLocation);
+	CenterChunk.X = FMath::FloorToInt((float)GV.X / ChunkSizeXY);
+	CenterChunk.Y = FMath::FloorToInt((float)GV.Y / ChunkSizeXY);
+}
+
+void AWorldManager::ResetGenerationState(bool DestroyChunkActors)
+{
+	for (TPair<FIntPoint, AWorldChunk*>& Entry : ActiveChunks)
+	{
+		if (Entry.Value && DestroyChunkActors)
+		{
+			Entry.Value->Destroy();
+		}
+	}
+
+	ActiveChunks.Empty();
+	ChunkGenQueue.Empty();
+	LODQueue.Empty();
+	PendingLOD.Empty();
+	ChunkGenAccumulator = 0.0f;
+	LODBuildAccumulator = 0.0f;
+	ActiveVoxelTasks = 0;
 }
 
 void AWorldManager::UpdateCenterChunk()
@@ -489,6 +567,38 @@ void AWorldManager::CatchUnqueuedChunks(AWorldChunk* Chunk, const FIntPoint& Chu
 	}
 }
 
+void AWorldManager::ProcessChunkRegisterQueue(float DeltaTime)
+{
+	if (!PlayerPawn) return;
+	if (ChunkRegisterQueue.Num() == 0) return;
+
+	SpawnAccumulator += DeltaTime * ChunkRegisterRate;
+
+	int32 NumToSpawn = FMath::FloorToInt(SpawnAccumulator);
+	if (NumToSpawn <= 0) return;
+
+	SpawnAccumulator -= NumToSpawn;
+
+	NumToSpawn = FMath::Min(NumToSpawn, ChunkRegisterQueue.Num());
+
+	SortRegisterQueueByDistance();
+
+	TArray<FIntPoint> Batch;
+	Batch.Reserve(NumToSpawn);
+
+	for (int32 i = 0; i < NumToSpawn; ++i)
+	{
+		Batch.Add(ChunkRegisterQueue[i]);
+	}
+
+	ChunkRegisterQueue.RemoveAt(0, NumToSpawn);
+
+	for (const FIntPoint& ChunkXY : Batch)
+	{
+		RegisterChunkAt(ChunkXY);
+	}
+}
+
 bool AWorldManager::HasPendingLOD0Work() const
 {
 	if (ChunkGenQueue.Num() > 0)
@@ -584,6 +694,21 @@ void AWorldManager::SortChunkQueueByDistance()
 	});
 }
 
+void AWorldManager::SortRegisterQueueByDistance()
+{
+	if (!PlayerPawn) return;
+
+	FVector PlayerPos = PlayerPawn->GetActorLocation();
+
+	const float ChunkWorldSize = ChunkSizeXY * VoxelScale;
+
+	ChunkRegisterQueue.Sort([&](const FIntPoint& A, const FIntPoint& B) {
+		FVector PosA = FVector(A.X * ChunkWorldSize, A.Y * ChunkWorldSize, 0.0f);
+		FVector PosB = FVector(B.X * ChunkWorldSize, B.Y * ChunkWorldSize, 0.0f);
+		return FVector::DistSquared(PosA, PlayerPos) < FVector::DistSquared(PosB, PlayerPos);
+	});
+}
+
 void AWorldManager::SortLODQueueByDistance()
 {
 	if (!PlayerPawn) return;
@@ -596,7 +721,7 @@ void AWorldManager::SortLODQueueByDistance()
 		FVector PosA = FVector(A.X * ChunkWorldSize, A.Y * ChunkWorldSize, 0.0f);
 		FVector PosB = FVector(B.X * ChunkWorldSize, B.Y * ChunkWorldSize, 0.0f);
 		return FVector::DistSquared(PosA, PlayerPos) < FVector::DistSquared(PosB, PlayerPos);
-		});
+	});
 }
 
 FIntVector AWorldManager::WorldPosToGlobalVoxel(const FVector& WorldPos) const
@@ -669,7 +794,7 @@ void AWorldManager::UpdateChunks()
 
 			if (!ActiveChunks.Find(ChunkXY))
 			{
-				RegisterChunkAt(ChunkXY);
+				ChunkRegisterQueue.Add(ChunkXY);
 			}
 		}
 	}

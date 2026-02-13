@@ -10,6 +10,12 @@ AWorldChunk::AWorldChunk()
     PrimaryActorTick.bCanEverTick = false;
 
     Mesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ProceduralMesh"));
+
+    if (BiomeDebugMaterial)
+    {
+        Mesh->SetMaterial(0, BiomeDebugMaterial);
+    }
+
     RootComponent = Mesh;
 }
 
@@ -720,11 +726,6 @@ bool AWorldChunk::BuildMarchingCubeData(int32 LODLevel, int32 LODStep, bool Proc
         }
     }
 
-    /*if (BiomeDebugMaterial)
-    {
-		Mesh->SetMaterial(0, BiomeDebugMaterial);
-    }*/
-
 	return true;
 }
 
@@ -861,9 +862,4 @@ void AWorldChunk::ApplyMeshData(const FChunkMeshBuffers& Buffers)
     const bool EnableCollision = (CurrentLODLevel == 0);
 	Mesh->CreateMeshSection(0, Buffers.Vertices, Buffers.Triangles, Buffers.Normals, Buffers.UVs, Buffers.VertexColors, {}, EnableCollision);
 	Mesh->SetCollisionEnabled(EnableCollision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-
-    if (BiomeDebugMaterial)
-    {
-		Mesh->SetMaterial(0, BiomeDebugMaterial);
-    }
 }
