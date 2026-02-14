@@ -184,5 +184,6 @@ private:
 	bool HasPendingLOD0Work() const;
 
 	void StartAsyncVoxelGen(AWorldChunk* Chunk, const FIntPoint& ChunkXY);
+	void BuildChunkSnapshot(AWorldChunk* Chunk, const FIntPoint& ChunkXY, int32 LODLevel, FChunkSnapshot& OutSnapshot) const;
 	void StartAsyncMeshBuild(AWorldChunk* Chunk, const FIntPoint& ChunkXY, int32 LODLevel, bool MarkNeighborsOnSuccess);
 };

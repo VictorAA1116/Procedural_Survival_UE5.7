@@ -230,8 +230,10 @@ void AWorldChunk::AddCubeFace(int FaceIndex, FVector& Position, float CubeSize, 
     Triangles.Add(Start + 3);
 }
 
-bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool ProceduralOnly, FChunkMeshBuffers& OutBuffers)
+bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool ProceduralOnly, FChunkMeshBuffers& OutBuffers, const FChunkSnapshot* Snapshot)
 {
+	(void)ProceduralOnly;
+
     OutBuffers.Vertices.Reset();
     OutBuffers.Triangles.Reset();
     OutBuffers.Normals.Reset();
@@ -244,7 +246,7 @@ bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool Procedu
     OutBuffers.Normals.Reserve(EstimatedFaces * 6 * 4);
     OutBuffers.UVs.Reserve(EstimatedFaces * 6 * 4);
 
-	const int ScaledVoxel = VoxelScale * LODStep;
+	const float ScaledVoxel = VoxelScale * LODStep;
 
     for (int x = 0; x < ChunkSizeXY; x += LODStep)
     {

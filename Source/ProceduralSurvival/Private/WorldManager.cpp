@@ -454,18 +454,107 @@ void AWorldManager::StartAsyncVoxelGen(AWorldChunk* Chunk, const FIntPoint& Chun
 	ActiveVoxelTasks.fetch_sub(1);
 }
 
+void AWorldManager::BuildChunkSnapshot(AWorldChunk* Chunk, const FIntPoint& ChunkXY, int32 LODLevel, FChunkSnapshot& OutSnapshot) const
+{
+	if (!Chunk || !TerrainGenerator) return;
+
+	const int32 ChunkSize = Chunk->GetChunkSizeXY();
+	const int32 HeightZ = Chunk->GetChunkHeightZ();
+	const int32 LODStep = FMath::Max(1, 1 << LODLevel);
+	const int32 SamplePadding = FMath::Max(1, LODStep);
+
+	OutSnapshot.ChunkCoords = ChunkXY;
+	OutSnapshot.ChunkSizeXY = ChunkSize;
+	OutSnapshot.ChunkHeightZ = HeightZ;
+	OutSnapshot.VoxelScale = Chunk->GetVoxelScale();
+	OutSnapshot.CurrentLODStep = LODStep;
+	OutSnapshot.SampleOriginX = ChunkXY.X * ChunkSize - SamplePadding;
+	OutSnapshot.SampleOriginY = ChunkXY.Y * ChunkSize - SamplePadding;
+	OutSnapshot.SampleSizeX = ChunkSize + SamplePadding * 2;
+	OutSnapshot.SampleSizeY = ChunkSize + SamplePadding * 2;
+
+	if (AWorldChunk* const* Neighbor = ActiveChunks.Find(ChunkXY + FIntPoint(1, 0)))
+	{
+		OutSnapshot.isNeighborLoadedPosX = (*Neighbor != nullptr);
+		OutSnapshot.NeighborLODPosX = OutSnapshot.isNeighborLoadedPosX ? (*Neighbor)->GetCurrentLODLevel() : 0;
+	}
+	if (AWorldChunk* const* Neighbor = ActiveChunks.Find(ChunkXY + FIntPoint(-1, 0)))
+	{
+		OutSnapshot.isNeighborLoadedNegX = (*Neighbor != nullptr);
+		OutSnapshot.NeighborLODNegX = OutSnapshot.isNeighborLoadedNegX ? (*Neighbor)->GetCurrentLODLevel() : 0;
+	}
+	if (AWorldChunk* const* Neighbor = ActiveChunks.Find(ChunkXY + FIntPoint(0, 1)))
+	{
+		OutSnapshot.isNeighborLoadedPosY = (*Neighbor != nullptr);
+		OutSnapshot.NeighborLODPosY = OutSnapshot.isNeighborLoadedPosY ? (*Neighbor)->GetCurrentLODLevel() : 0;
+	}
+	if (AWorldChunk* const* Neighbor = ActiveChunks.Find(ChunkXY + FIntPoint(0, -1)))
+	{
+		OutSnapshot.isNeighborLoadedNegY = (*Neighbor != nullptr);
+		OutSnapshot.NeighborLODNegY = OutSnapshot.isNeighborLoadedNegY ? (*Neighbor)->GetCurrentLODLevel() : 0;
+	}
+
+	if (Chunk->AreVoxelsGenerated())
+	{
+		const int32 Total = ChunkSize * ChunkSize * HeightZ;
+		OutSnapshot.VoxelDataCopy.SetNumUninitialized(Total);
+
+		for (int32 Z = 0; Z < HeightZ; ++Z)
+		{
+			for (int32 Y = 0; Y < ChunkSize; ++Y)
+			{
+				for (int32 X = 0; X < ChunkSize; ++X)
+				{
+					const int32 Index = X + Y * ChunkSize + Z * ChunkSize * ChunkSize;
+					const float Density = Chunk->GetVoxelDensity(FIntVector(X, Y, Z));
+					OutSnapshot.VoxelDataCopy[Index].density = Density;
+					OutSnapshot.VoxelDataCopy[Index].isSolid = (Density >= 0.0f);
+				}
+			}
+		}
+
+		OutSnapshot.hasVoxelData = true;
+	}
+
+	const int32 XYCount = OutSnapshot.SampleSizeX * OutSnapshot.SampleSizeY;
+	OutSnapshot.DensityGrid.SetNumUninitialized(XYCount * HeightZ);
+	OutSnapshot.BiomeGrid.SetNumUninitialized(XYCount);
+
+	for (int32 Y = 0; Y < OutSnapshot.SampleSizeY; ++Y)
+	{
+		const int32 GlobalY = OutSnapshot.SampleOriginY + Y;
+
+		for (int32 X = 0; X < OutSnapshot.SampleSizeX; ++X)
+		{
+			const int32 GlobalX = OutSnapshot.SampleOriginX + X;
+			const int32 XYIndex = X + Y * OutSnapshot.SampleSizeX;
+
+			OutSnapshot.BiomeGrid[XYIndex] = static_cast<uint8>(TerrainGenerator->GetDominantBiome(GlobalX, GlobalY));
+
+			for (int32 Z = 0; Z < HeightZ; ++Z)
+			{
+				const int32 Index = XYIndex + Z * XYCount;
+				OutSnapshot.DensityGrid[Index] = TerrainGenerator->GetDensity(GlobalX, GlobalY, Z);
+			}
+		}
+	}
+}
+
 void AWorldManager::StartAsyncMeshBuild(AWorldChunk* Chunk, const FIntPoint& ChunkXY, int32 LODLevel, bool MarkNeighborsOnSuccess)
 {
 	if (!Chunk) return;
 
+	FChunkSnapshot Snapshot;
+	BuildChunkSnapshot(Chunk, ChunkXY, LODLevel, Snapshot);
+
 	TWeakObjectPtr<AWorldChunk> WeakChunk = Chunk;
 	TWeakObjectPtr<AWorldManager> WeakManager = this;
 
-	Async(EAsyncExecution::ThreadPool, [WeakChunk, WeakManager, ChunkXY, LODLevel, MarkNeighborsOnSuccess]() mutable
+	Async(EAsyncExecution::ThreadPool, [WeakChunk, WeakManager, ChunkXY, LODLevel, MarkNeighborsOnSuccess, Snapshot = MoveTemp(Snapshot)]() mutable
 	{
 		FChunkMeshBuffers Buffers;
 
-		const bool isBuilt = WeakChunk.IsValid() ? WeakChunk->BuildMeshLODData(LODLevel, Buffers) : false;
+		const bool isBuilt = WeakChunk.IsValid() ? WeakChunk->BuildMeshLODData(LODLevel, Buffers, &Snapshot) : false;
 
 		AsyncTask(ENamedThreads::GameThread, [WeakChunk, WeakManager, ChunkXY, LODLevel, isBuilt, MarkNeighborsOnSuccess, Buffers = MoveTemp(Buffers)] () mutable
 		{

@@ -5,6 +5,7 @@
 #include "ProceduralMeshComponent.h"
 #include "Voxel.h"
 #include "VoxelRenderMode.h"
+#include "TerrainGenerator.h"
 #include "WorldChunk.generated.h"
 
 class UProceduralMeshComponent;
@@ -21,7 +22,7 @@ struct FChunkMeshBuffers
 
 struct FChunkSnapshot
 {
-    FIntPoint ChunkCoords;
+    FIntPoint ChunkCoords = FIntPoint::ZeroValue;
 	int32 ChunkSizeXY = 0;
 	int32 ChunkHeightZ = 0;
 	float VoxelScale = 100.0f;
@@ -29,6 +30,15 @@ struct FChunkSnapshot
 
 	TArray<FVoxel> VoxelDataCopy;
 	bool hasVoxelData = false;
+
+	bool isNeighborLoadedPosX = false;
+	bool isNeighborLoadedNegX = false;
+	bool isNeighborLoadedPosY = false;
+	bool isNeighborLoadedNegY = false;
+	int32 NeighborLODPosX = 0;
+	int32 NeighborLODNegX = 0;
+	int32 NeighborLODPosY = 0;
+	int32 NeighborLODNegY = 0;
 
     TArray<float> DensityGrid;
 	int32 SampleOriginX = 0;
@@ -40,18 +50,37 @@ struct FChunkSnapshot
 
     FORCEINLINE float GetSampledDensity(int32 GlobalX, int32 GlobalY, int32 GlobalZ) const
     {
-		const int gx = GlobalX - SampleOriginX;
-		const int gy = GlobalY - SampleOriginY;
+		const int32 gx = GlobalX - SampleOriginX;
+		const int32 gy = GlobalY - SampleOriginY;
         if (gx < 0 || gy < 0 || gx >= SampleSizeX || gy >= SampleSizeY) return 1.0f;
-		if (GlobalZ < 0 || GlobalZ >= ChunkHeightZ) return 1.0f;
-		const int Index = gx + gy * SampleSizeX + GlobalZ * SampleSizeX * SampleSizeY;
+		if (GlobalZ < 0 || GlobalZ >= ChunkHeightZ) return (GlobalZ < 0) ? 1.0f : -1.0f;
+		const int32 Index = gx + gy * SampleSizeX + GlobalZ * SampleSizeX * SampleSizeY;
 		return DensityGrid.IsValidIndex(Index) ? DensityGrid[Index] : 1.0f;
 	}
 
-    FORCEINLINE EBiomeType GetSampledBiome(int32 LocalX, int32 LocalY) const
+    FORCEINLINE bool TryGetVoxelDensityFromCopy(int32 GlobalX, int32 GlobalY, int32 GlobalZ, float& OutDensity) const
     {
-		if (LocalX < 0 || LocalY < 0 || LocalX >= SampleSizeX || LocalY >= SampleSizeY) return EBiomeType::Plains;
-		const int Index = LocalX + LocalY * SampleSizeX;
+		if (!hasVoxelData || GlobalZ < 0 || GlobalZ>= ChunkHeightZ) return false;
+
+		const int32 LocalX = GlobalX - ChunkCoords.X * ChunkSizeXY;
+		const int32 LocalY = GlobalY - ChunkCoords.Y * ChunkSizeXY;
+
+		if (LocalX < 0 || LocalY < 0 || LocalX >= ChunkSizeXY || LocalY >= ChunkSizeXY) return false;
+
+		const int32 LocalIndex = LocalX + LocalY * ChunkSizeXY + GlobalZ * ChunkSizeXY * ChunkSizeXY;
+		if (!VoxelDataCopy.IsValidIndex(LocalIndex)) return false;
+
+		OutDensity = VoxelDataCopy[LocalIndex].density;
+		return true;
+    }
+
+    FORCEINLINE EBiomeType GetSampledBiome(int32 GlobalX, int32 GlobalY) const
+    {
+		const int32 gx = GlobalX - SampleOriginX;
+        const int32 gy = GlobalY - SampleOriginY;
+		if (gx < 0 || gy < 0 || gx >= SampleSizeX || gy >= SampleSizeY) return EBiomeType::Plains;
+
+		const int32 Index = gx + gy * SampleSizeX;
 		return BiomeGrid.IsValidIndex(Index) ? static_cast<EBiomeType>(BiomeGrid[Index]) : EBiomeType::Plains;
     }
 };
@@ -83,7 +112,7 @@ public:
 
 	bool GenerateMeshLOD(int32 LODLevel);
 
-    bool BuildMeshLODData(int32 LODLevel, FChunkMeshBuffers& OutBuffers);
+    bool BuildMeshLODData(int32 LODLevel, FChunkMeshBuffers& OutBuffers, const FChunkSnapshot* Snapshot = nullptr);
 
     void ApplyMeshData(const FChunkMeshBuffers& Buffers);
 
@@ -166,14 +195,14 @@ private:
 
     int LocalIndex(int X, int Y, int Z) const;
 
-    bool BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool ProceduralOnly, FChunkMeshBuffers& OutBuffers);
-    bool BuildMarchingCubeData(int32 LODLevel, int32 LODStep, bool ProceduralOnly, FChunkMeshBuffers& OutBuffers);
+    bool BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool ProceduralOnly, FChunkMeshBuffers& OutBuffers, const FChunkSnapshot* Snapshot = nullptr);
+    bool BuildMarchingCubeData(int32 LODLevel, int32 LODStep, bool ProceduralOnly, FChunkMeshBuffers& OutBuffers, const FChunkSnapshot* Snapshot = nullptr);
 
-    float SampleDensityForMarching(int GlobalX, int GlobalY, int GlobalZ, bool ProceduralOnly) const;
+    float SampleDensityForMarching(int GlobalX, int GlobalY, int GlobalZ, bool ProceduralOnly, const FChunkSnapshot* Snapshot = nullptr) const;
 
     bool VoxelsGenerated = false;
 
-    void ComputeGradient(TArray<FVector>& GradientCache);
+    void ComputeGradient(TArray<FVector>& GradientCache, const FChunkSnapshot* Snapshot = nullptr);
 
     FVector VertexInterp(float IsoLevel, const FVector& P1, const FVector& P2, float ValP1, float ValP2) const;
 };
