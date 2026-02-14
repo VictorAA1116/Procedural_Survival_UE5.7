@@ -19,6 +19,43 @@ struct FChunkMeshBuffers
     TArray<FColor> VertexColors;
 };
 
+struct FChunkSnapshot
+{
+    FIntPoint ChunkCoords;
+	int32 ChunkSizeXY = 0;
+	int32 ChunkHeightZ = 0;
+	float VoxelScale = 100.0f;
+	int32 CurrentLODStep = 1;
+
+	TArray<FVoxel> VoxelDataCopy;
+	bool hasVoxelData = false;
+
+    TArray<float> DensityGrid;
+	int32 SampleOriginX = 0;
+	int32 SampleOriginY = 0;
+	int32 SampleSizeX = 0;
+	int32 SampleSizeY = 0;
+
+    TArray<uint8> BiomeGrid;
+
+    FORCEINLINE float GetSampledDensity(int32 GlobalX, int32 GlobalY, int32 GlobalZ) const
+    {
+		const int gx = GlobalX - SampleOriginX;
+		const int gy = GlobalY - SampleOriginY;
+        if (gx < 0 || gy < 0 || gx >= SampleSizeX || gy >= SampleSizeY) return 1.0f;
+		if (GlobalZ < 0 || GlobalZ >= ChunkHeightZ) return 1.0f;
+		const int Index = gx + gy * SampleSizeX + GlobalZ * SampleSizeX * SampleSizeY;
+		return DensityGrid.IsValidIndex(Index) ? DensityGrid[Index] : 1.0f;
+	}
+
+    FORCEINLINE EBiomeType GetSampledBiome(int32 LocalX, int32 LocalY) const
+    {
+		if (LocalX < 0 || LocalY < 0 || LocalX >= SampleSizeX || LocalY >= SampleSizeY) return EBiomeType::Plains;
+		const int Index = LocalX + LocalY * SampleSizeX;
+		return BiomeGrid.IsValidIndex(Index) ? static_cast<EBiomeType>(BiomeGrid[Index]) : EBiomeType::Plains;
+    }
+};
+
 enum class EChunkGenPhase : uint8
 {
     None,
