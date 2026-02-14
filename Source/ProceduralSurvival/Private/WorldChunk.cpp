@@ -343,14 +343,10 @@ bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool Procedu
                     }
 
 					if (!WorldManager) return false;
-
-					FIntPoint NeighborXY = ChunkCoords + FIntPoint(dx, dy);
                     
-					AWorldChunk* Neighbor = WorldManager->GetChunkAt(NeighborXY);
-					if (!Neighbor) return false;
-
-                    int NeighborLOD = Neighbor->GetCurrentLODLevel();
-					return (Neighbor && NeighborLOD != LODLevel);
+					AWorldChunk* Neighbor = WorldManager->GetChunkAt(ChunkCoords + FIntPoint(dx, dy));
+					
+					return (Neighbor && Neighbor->GetCurrentLODLevel() != LODLevel);
 				};
 
                 auto NeighborSolid = [&](int NX, int NY, int NZ) -> bool
@@ -825,6 +821,8 @@ float AWorldChunk::SampleDensityForMarching(int GlobalX, int GlobalY, int Global
 				return VoxelDensity;
             }
         }
+
+		return Snapshot->GetSampledDensity(GlobalX, GlobalY, GlobalZ);
     }
     if (!WorldManager || !WorldManager->TerrainGenerator) return 1.0f;
 

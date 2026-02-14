@@ -464,6 +464,7 @@ void AWorldManager::BuildChunkSnapshot(AWorldChunk* Chunk, const FIntPoint& Chun
 	const int32 SamplePadding = FMath::Max(1, LODStep);
 
 	OutSnapshot.ChunkCoords = ChunkXY;
+	OutSnapshot.TerrainGenerator = TerrainGenerator;
 	OutSnapshot.ChunkSizeXY = ChunkSize;
 	OutSnapshot.ChunkHeightZ = HeightZ;
 	OutSnapshot.VoxelScale = Chunk->GetVoxelScale();
@@ -516,7 +517,7 @@ void AWorldManager::BuildChunkSnapshot(AWorldChunk* Chunk, const FIntPoint& Chun
 		OutSnapshot.hasVoxelData = true;
 	}
 
-	const int32 XYCount = OutSnapshot.SampleSizeX * OutSnapshot.SampleSizeY;
+	/*const int32 XYCount = OutSnapshot.SampleSizeX * OutSnapshot.SampleSizeY;
 	OutSnapshot.DensityGrid.SetNumUninitialized(XYCount * HeightZ);
 	OutSnapshot.BiomeGrid.SetNumUninitialized(XYCount);
 
@@ -537,7 +538,7 @@ void AWorldManager::BuildChunkSnapshot(AWorldChunk* Chunk, const FIntPoint& Chun
 				OutSnapshot.DensityGrid[Index] = TerrainGenerator->GetDensity(GlobalX, GlobalY, Z);
 			}
 		}
-	}
+	}*/
 }
 
 void AWorldManager::StartAsyncMeshBuild(AWorldChunk* Chunk, const FIntPoint& ChunkXY, int32 LODLevel, bool MarkNeighborsOnSuccess)

@@ -22,6 +22,8 @@ struct FChunkMeshBuffers
 
 struct FChunkSnapshot
 {
+	UTerrainGenerator* TerrainGenerator = nullptr;
+
     FIntPoint ChunkCoords = FIntPoint::ZeroValue;
 	int32 ChunkSizeXY = 0;
 	int32 ChunkHeightZ = 0;
@@ -61,8 +63,16 @@ struct FChunkSnapshot
     {
 		const int32 gx = GlobalX - SampleOriginX;
 		const int32 gy = GlobalY - SampleOriginY;
+        if (GlobalZ < 0 || GlobalZ >= ChunkHeightZ) return (GlobalZ < 0) ? 1.0f : -1.0f;
+
+        if (DensityGrid.Num() == 0)
+        {
+			if (!TerrainGenerator) return 1.0f;
+			return TerrainGenerator->GetDensity(GlobalX, GlobalY, GlobalZ);
+        }
+
         if (gx < 0 || gy < 0 || gx >= SampleSizeX || gy >= SampleSizeY) return 1.0f;
-		if (GlobalZ < 0 || GlobalZ >= ChunkHeightZ) return (GlobalZ < 0) ? 1.0f : -1.0f;
+
 		const int32 Index = gx + gy * SampleSizeX + GlobalZ * SampleSizeX * SampleSizeY;
 		return DensityGrid.IsValidIndex(Index) ? DensityGrid[Index] : 1.0f;
 	}
@@ -85,6 +95,12 @@ struct FChunkSnapshot
 
     FORCEINLINE EBiomeType GetSampledBiome(int32 GlobalX, int32 GlobalY) const
     {
+        if (BiomeGrid.Num() == 0)
+        {
+			if (!TerrainGenerator) return EBiomeType::Plains;
+			return TerrainGenerator->GetDominantBiome(GlobalX, GlobalY);
+        }
+
 		const int32 gx = GlobalX - SampleOriginX;
         const int32 gy = GlobalY - SampleOriginY;
 		if (gx < 0 || gy < 0 || gx >= SampleSizeX || gy >= SampleSizeY) return EBiomeType::Plains;
