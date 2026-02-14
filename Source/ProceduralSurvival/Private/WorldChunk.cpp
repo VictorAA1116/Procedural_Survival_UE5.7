@@ -339,7 +339,7 @@ bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool Procedu
                 {
                     if (Snapshot)
                     {
-                        return (Snapshot->isNeighborDifferentLOD(dx, dy, LODLevel))
+                        return (Snapshot->IsNeighborDifferentLOD(dx, dy, LODLevel));
                     }
 
 					if (!WorldManager) return false;
@@ -504,7 +504,7 @@ bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool Procedu
     return true;
 }
 
-bool AWorldChunk::BuildMarchingCubeData(int32 LODLevel, int32 LODStep, bool ProceduralOnly, FChunkMeshBuffers& OutBuffers, const FChunkSnapshot* Snapshot = nullptr)
+bool AWorldChunk::BuildMarchingCubeData(int32 LODLevel, int32 LODStep, bool ProceduralOnly, FChunkMeshBuffers& OutBuffers, const FChunkSnapshot* Snapshot)
 {
     // if (LODLevel == 0 && (!WorldManager || !WorldManager->AreAllNeighborChunksVoxelReady(ChunkCoords))) return false;
 
@@ -811,34 +811,27 @@ void AWorldChunk::ApplyGeneratedVoxels(TArray<FVoxel>&& InVoxels)
 
 float AWorldChunk::SampleDensityForMarching(int GlobalX, int GlobalY, int GlobalZ, bool ProceduralOnly, const FChunkSnapshot* Snapshot) const
 {
-    if (!WorldManager || !WorldManager->TerrainGenerator) return 1.0f;
 	if (GlobalZ < 0) return 1.0f;
 	if (GlobalZ >= ChunkHeightZ) return -1.0f;
 
-    FIntPoint ChunkXY;
-    FIntVector LocalXYZ;
-    WorldManager->GlobalVoxelToChunkCoords(GlobalX, GlobalY, GlobalZ, ChunkXY, LocalXYZ);
-
-    if (!ProceduralOnly)
+    if (Snapshot)
     {
-        if (AWorldChunk* Neighbor = WorldManager->GetChunkAt(ChunkXY))
+        if (!ProceduralOnly)
         {
-            if (Neighbor->AreVoxelsGenerated() && LocalXYZ.X >= 0 && LocalXYZ.X < Neighbor->GetChunkSizeXY() && LocalXYZ.Y >= 0 && LocalXYZ.Y < Neighbor->GetChunkSizeXY() && LocalXYZ.Z >= 0 && LocalXYZ.Z < Neighbor->GetChunkHeightZ())
+			float VoxelDensity = 0.0f;
+
+            if (Snapshot->TryGetVoxelDensityFromCopy(GlobalX, GlobalY, GlobalZ, VoxelDensity))
             {
-                return Neighbor->GetVoxelDensity(LocalXYZ);
+				return VoxelDensity;
             }
         }
     }
+    if (!WorldManager || !WorldManager->TerrainGenerator) return 1.0f;
 
-    /*if (!ProceduralOnly && (!WorldManager->IsChunkWithinRenderDistance(ChunkXY) || !WorldManager->IsNeighborChunkLoaded(ChunkXY)))
-    {
-        return -1.0f;
-    }*/
-
-	return WorldManager->TerrainGenerator->GetDensity((float)GlobalX, (float)GlobalY, (float)GlobalZ);
+    return WorldManager->TerrainGenerator->GetDensity((float)GlobalX, (float)GlobalY, (float)GlobalZ);
 }
 
-void AWorldChunk::ComputeGradient(TArray<FVector>& GradientCache)
+void AWorldChunk::ComputeGradient(TArray<FVector>& GradientCache, const FChunkSnapshot* Snapshot)
 {
     const int EPS = 1;
 
@@ -852,9 +845,9 @@ void AWorldChunk::ComputeGradient(TArray<FVector>& GradientCache)
                 int GY = ChunkCoords.Y * ChunkSizeXY + y;
                 int GZ = z;
 
-                const float DX = (float)SampleDensityForMarching(GX + EPS, GY, GZ, useProceduralDensityOnly) - (float)SampleDensityForMarching(GX - EPS, GY, GZ, useProceduralDensityOnly);
-                const float DY = (float)SampleDensityForMarching(GX, GY + EPS, GZ, useProceduralDensityOnly) - (float)SampleDensityForMarching(GX, GY - EPS, GZ, useProceduralDensityOnly);
-                const float DZ = (float)SampleDensityForMarching(GX, GY, GZ + EPS, useProceduralDensityOnly) - (float)SampleDensityForMarching(GX, GY, GZ - EPS, useProceduralDensityOnly);
+                const float DX = (float)SampleDensityForMarching(GX + EPS, GY, GZ, useProceduralDensityOnly, Snapshot) - (float)SampleDensityForMarching(GX - EPS, GY, GZ, useProceduralDensityOnly, Snapshot);
+                const float DY = (float)SampleDensityForMarching(GX, GY + EPS, GZ, useProceduralDensityOnly, Snapshot) - (float)SampleDensityForMarching(GX, GY - EPS, GZ, useProceduralDensityOnly, Snapshot);
+                const float DZ = (float)SampleDensityForMarching(GX, GY, GZ + EPS, useProceduralDensityOnly, Snapshot) - (float)SampleDensityForMarching(GX, GY, GZ - EPS, useProceduralDensityOnly, Snapshot);
 
 				GradientCache[LocalIndex(x, y, z)] = FVector(DX, DY, DZ).GetSafeNormal();
             }
@@ -884,7 +877,7 @@ bool AWorldChunk::GenerateMeshLOD(int32 LODLevel)
 {
     FChunkMeshBuffers Buffers;
 
-    if (!BuildMeshLODData(LODLevel, Buffers))
+    if (!BuildMeshLODData(LODLevel, Buffers, nullptr))
     {
         return false;
 	}
@@ -894,7 +887,7 @@ bool AWorldChunk::GenerateMeshLOD(int32 LODLevel)
 	return true;
 }
 
-bool AWorldChunk::BuildMeshLODData(int32 LODLevel, FChunkMeshBuffers& OutBuffers)
+bool AWorldChunk::BuildMeshLODData(int32 LODLevel, FChunkMeshBuffers& OutBuffers, const FChunkSnapshot* Snapshot)
 {
 	CurrentLODLevel = LODLevel;
 	useProceduralDensityOnly = (LODLevel > 0);
@@ -905,11 +898,11 @@ bool AWorldChunk::BuildMeshLODData(int32 LODLevel, FChunkMeshBuffers& OutBuffers
 
     if (RenderMode == EVoxelRenderMode::Cubes)
     {
-        return BuildCubicMeshData(LODLevel, LODStep, ProceduralOnly, OutBuffers);
+        return BuildCubicMeshData(LODLevel, LODStep, ProceduralOnly, OutBuffers, Snapshot);
     }
     else if (RenderMode == EVoxelRenderMode::MarchingCubes)
     {
-        return BuildMarchingCubeData(LODLevel, LODStep, ProceduralOnly, OutBuffers);
+        return BuildMarchingCubeData(LODLevel, LODStep, ProceduralOnly, OutBuffers, Snapshot);
     }
 
     return false;

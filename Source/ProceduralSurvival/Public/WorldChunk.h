@@ -48,6 +48,15 @@ struct FChunkSnapshot
 
     TArray<uint8> BiomeGrid;
 
+    FORCEINLINE bool IsNeighborDifferentLOD(int32 DirX, int32 DirY, int32 LODLevel) const
+    {
+		if (DirX == 1 && DirY == 0) return isNeighborLoadedPosX && NeighborLODPosX != LODLevel;
+		if (DirX == -1 && DirY == 0) return isNeighborLoadedNegX && NeighborLODNegX != LODLevel;
+		if (DirX == 0 && DirY == 1) return isNeighborLoadedPosY && NeighborLODPosY != LODLevel;
+		if (DirX == 0 && DirY == -1) return isNeighborLoadedNegY && NeighborLODNegY != LODLevel;
+        return false;
+	}
+
     FORCEINLINE float GetSampledDensity(int32 GlobalX, int32 GlobalY, int32 GlobalZ) const
     {
 		const int32 gx = GlobalX - SampleOriginX;
