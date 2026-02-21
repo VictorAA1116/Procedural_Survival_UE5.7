@@ -10,18 +10,17 @@ AWorldChunk::AWorldChunk()
     PrimaryActorTick.bCanEverTick = false;
 
     Mesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ProceduralMesh"));
-
-    if (BiomeDebugMaterial)
-    {
-        Mesh->SetMaterial(0, BiomeDebugMaterial);
-    }
-
     RootComponent = Mesh;
 }
 
 void AWorldChunk::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (BiomeDebugMaterial)
+    {
+        Mesh->SetMaterial(0, BiomeDebugMaterial);
+    }
 }
 
 void AWorldChunk::InitializeChunk(int InChunkSizeXY, int InChunkHeightZ, float InVoxelScale, const FIntPoint& InChunkCoords)
@@ -252,6 +251,11 @@ bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool Procedu
     {
         if (LODLevel == 0)
         {
+            if (AreVoxelsGenerated())
+            {
+                return GetVoxelDensity({ LocalX, LocalY, GlobalZ });
+            }
+
             if (Snapshot)
             {
 				float SnapshotDensity = 0.0f;
@@ -260,10 +264,6 @@ bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool Procedu
                     return SnapshotDensity;
 				}
             }
-            else if (AreVoxelsGenerated())
-            {
-                return GetVoxelDensity({ LocalX, LocalY, GlobalZ });
-			}
         }
 
         if (Snapshot)
@@ -425,14 +425,14 @@ bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool Procedu
 
                 if (x + LODStep >= ChunkSizeXY)
                 {
-                    if ((IsNeighborDifferentLOD(1, 0) && isNearSurface) || !NeighborSolid(x + LODStep, y, z))
+                    if (IsNeighborDifferentLOD(1, 0) && isNearSurface)
                     {
                         AddCubeFace(0, BasePos, ScaledVoxel, BiomeColor, OutBuffers.Vertices, OutBuffers.Triangles, OutBuffers.Normals, OutBuffers.UVs, OutBuffers.VertexColors); // Right
 					}
-                    //else if (!NeighborSolid(x + LODStep, y, z))
-                    //{
-                    //    AddCubeFace(0, BasePos, ScaledVoxel, BiomeColor, OutBuffers.Vertices, OutBuffers.Triangles, OutBuffers.Normals, OutBuffers.UVs, OutBuffers.VertexColors); // Right
-                    //}
+                    else if (!NeighborSolid(x + LODStep, y, z))
+                    {
+                        AddCubeFace(0, BasePos, ScaledVoxel, BiomeColor, OutBuffers.Vertices, OutBuffers.Triangles, OutBuffers.Normals, OutBuffers.UVs, OutBuffers.VertexColors); // Right
+                    }
                 }
                 else if (!NeighborSolid(x + LODStep, y, z))
                 {
@@ -441,14 +441,14 @@ bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool Procedu
 
                 if (x - LODStep < 0)
                 {
-                    if ((IsNeighborDifferentLOD(-1, 0) && isNearSurface) || !NeighborSolid(x + LODStep, y, z))
+                    if (IsNeighborDifferentLOD(-1, 0) && isNearSurface)
                     {
                         AddCubeFace(1, BasePos, ScaledVoxel, BiomeColor, OutBuffers.Vertices, OutBuffers.Triangles, OutBuffers.Normals, OutBuffers.UVs, OutBuffers.VertexColors); // Left
                     }
-                    //else if (!NeighborSolid(x - LODStep, y, z))
-                    //{
-                    //    AddCubeFace(1, BasePos, ScaledVoxel, BiomeColor, OutBuffers.Vertices, OutBuffers.Triangles, OutBuffers.Normals, OutBuffers.UVs, OutBuffers.VertexColors); // Left
-                    //}
+                    else if (!NeighborSolid(x - LODStep, y, z))
+                    {
+                        AddCubeFace(1, BasePos, ScaledVoxel, BiomeColor, OutBuffers.Vertices, OutBuffers.Triangles, OutBuffers.Normals, OutBuffers.UVs, OutBuffers.VertexColors); // Left
+                    }
                 }
                 else if (!NeighborSolid(x - LODStep, y, z))
                 {
@@ -457,14 +457,14 @@ bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool Procedu
 
                 if (y + LODStep >= ChunkSizeXY)
                 {
-                    if ((IsNeighborDifferentLOD(0, 1) && isNearSurface) || !NeighborSolid(x, y + LODStep, z))
+                    if (IsNeighborDifferentLOD(0, 1) && isNearSurface)
                     {
                         AddCubeFace(2, BasePos, ScaledVoxel, BiomeColor, OutBuffers.Vertices, OutBuffers.Triangles, OutBuffers.Normals, OutBuffers.UVs, OutBuffers.VertexColors); // Front
                     }
-                    //else if (!NeighborSolid(x, y + LODStep, z))
-                    //{
-                    //    AddCubeFace(2, BasePos, ScaledVoxel, BiomeColor, OutBuffers.Vertices, OutBuffers.Triangles, OutBuffers.Normals, OutBuffers.UVs, OutBuffers.VertexColors); // Front
-                    //}
+                    else if (!NeighborSolid(x, y + LODStep, z))
+                    {
+                        AddCubeFace(2, BasePos, ScaledVoxel, BiomeColor, OutBuffers.Vertices, OutBuffers.Triangles, OutBuffers.Normals, OutBuffers.UVs, OutBuffers.VertexColors); // Front
+                    }
                 }
                 else if (!NeighborSolid(x, y + LODStep, z))
                 {
@@ -473,14 +473,14 @@ bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool Procedu
 
                 if (y - LODStep < 0)
                 {
-                    if ((IsNeighborDifferentLOD(0, -1) && isNearSurface) || !NeighborSolid(x, y - LODStep, z))
+                    if (IsNeighborDifferentLOD(0, -1) && isNearSurface)
                     {
                         AddCubeFace(3, BasePos, ScaledVoxel, BiomeColor, OutBuffers.Vertices, OutBuffers.Triangles, OutBuffers.Normals, OutBuffers.UVs, OutBuffers.VertexColors); // Back
                     }
-                    //else if (!NeighborSolid(x, y - LODStep, z))
-                    //{
-                    //    AddCubeFace(3, BasePos, ScaledVoxel, BiomeColor, OutBuffers.Vertices, OutBuffers.Triangles, OutBuffers.Normals, OutBuffers.UVs, OutBuffers.VertexColors); // Back
-                    //}
+                    else if (!NeighborSolid(x, y - LODStep, z))
+                    {
+                        AddCubeFace(3, BasePos, ScaledVoxel, BiomeColor, OutBuffers.Vertices, OutBuffers.Triangles, OutBuffers.Normals, OutBuffers.UVs, OutBuffers.VertexColors); // Back
+                    }
                 }
                 else if (!NeighborSolid(x, y - LODStep, z))
                 {
@@ -914,4 +914,5 @@ void AWorldChunk::ApplyMeshData(const FChunkMeshBuffers& Buffers)
     const bool EnableCollision = (CurrentLODLevel == 0);
 	Mesh->CreateMeshSection(0, Buffers.Vertices, Buffers.Triangles, Buffers.Normals, Buffers.UVs, Buffers.VertexColors, {}, EnableCollision);
 	Mesh->SetCollisionEnabled(EnableCollision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+	//Mesh->SetMaterial(0, BiomeDebugMaterial);
 }
