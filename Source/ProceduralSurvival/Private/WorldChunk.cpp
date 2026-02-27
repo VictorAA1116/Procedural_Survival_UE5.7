@@ -251,7 +251,12 @@ bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool Procedu
     {
         if (LODLevel == 0)
         {
-            if (AreVoxelsGenerated())
+            bool HasLocalSample =
+                (LocalX >= 0 && LocalX < ChunkSizeXY) && 
+                (LocalY >= 0 && LocalY < ChunkSizeXY) && 
+                (GlobalZ >= 0 && GlobalZ < ChunkHeightZ);
+
+            if (AreVoxelsGenerated() && HasLocalSample)
             {
                 return GetVoxelDensity({ LocalX, LocalY, GlobalZ });
             }
@@ -263,6 +268,12 @@ bool AWorldChunk::BuildCubicMeshData(int32 LODLevel, int32 LODStep, bool Procedu
                 {
                     return SnapshotDensity;
 				}
+            }
+
+            if (WorldManager)
+            {
+                const bool NeighborSolid = WorldManager->IsVoxelSolidGlobal(GlobalX, GlobalY, GlobalZ);
+                return NeighborSolid ? 1.0f : -1.0f;
             }
         }
 
