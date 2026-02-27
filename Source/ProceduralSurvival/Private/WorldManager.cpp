@@ -144,13 +144,14 @@ void AWorldManager::ResetGenerationState(bool DestroyChunkActors)
 	ChunkGenAccumulator = 0.0f;
 	LODBuildAccumulator = 0.0f;
 	ActiveVoxelTasks = 0;
+	isChunkWindowInitialized = false;
 }
 
 void AWorldManager::UpdateCenterChunk()
 {
-	if (!PlayerPawn) return;
+	//if (!PlayerPawn) return;
+	FVector PlayerPos = PlayerPawn? PlayerPawn->GetActorLocation() : FVector(0,0,0);
 
-	FVector PlayerPos = PlayerPawn->GetActorLocation();
 	FIntVector GV = WorldPosToGlobalVoxel(PlayerPos);
 	FIntPoint NewCenterChunk;
 	NewCenterChunk.X = FMath::FloorToInt((float)GV.X / ChunkSizeXY);
@@ -864,46 +865,164 @@ bool AWorldManager::IsVoxelSolidGlobal(int GlobalVoxelX, int GlobalVoxelY, int G
 
 void AWorldManager::UpdateChunks()
 {
-	if (!ChunkClass)
-	{
-		/*UE_LOG(LogTemp, Warning, TEXT("WorldManager: ChunkClass not set!"));*/
-		return;
-	}
+	if (!ChunkClass) return;
 
-	// Determine which chunks should be active
-	TSet<FIntPoint> DesiredChunks;
-	TArray<FIntPoint> ChunksToSpawn;
-	ChunksToSpawn.Empty();
-
-	for (int DX = -RenderDistance; DX <= RenderDistance; ++DX)
+	auto QueueChunkIfNeeded = [this](const FIntPoint& ChunkXY)
 	{
-		for (int DY = -RenderDistance; DY <= RenderDistance; ++DY)
+		if (!ActiveChunks.Find(ChunkXY) && !ChunkRegisterQueue.Contains(ChunkXY))
 		{
-			FIntPoint ChunkXY = FIntPoint(CenterChunk.X + DX, CenterChunk.Y + DY);
-			DesiredChunks.Add(ChunkXY);
+			ChunkRegisterQueue.Add(ChunkXY);
+		}
+	};
 
-			if (!ActiveChunks.Find(ChunkXY))
+	const bool needsFullRebuild = !isChunkWindowInitialized
+		|| ActiveChunks.Num() == 0
+		|| FMath::Abs(CenterChunk.X - LastChunkWindowCenter.X) > (RenderDistance * 2)
+		|| FMath::Abs(CenterChunk.Y - LastChunkWindowCenter.Y) > (RenderDistance * 2);
+
+	if (needsFullRebuild)
+	{
+		TSet<FIntPoint> DesiredChunks;
+
+		for (int DX = -RenderDistance; DX <= RenderDistance; ++DX)
+		{
+			for (int DY = -RenderDistance; DY <= RenderDistance; ++DY)
 			{
-				ChunkRegisterQueue.Add(ChunkXY);
+				FIntPoint ChunkXY = FIntPoint(CenterChunk.X + DX, CenterChunk.Y + DY);
+				DesiredChunks.Add(ChunkXY);
+				QueueChunkIfNeeded(ChunkXY);
 			}
 		}
-	}
 
-	// Destroy chunks that are no longer needed
-	TArray<FIntPoint> ChunksToRemove;
+		TArray<FIntPoint> ChunksToRemove;
 
-	for (auto& Pair : ActiveChunks)
-	{
-		if (!DesiredChunks.Contains(Pair.Key))
+		for (const TPair<FIntPoint, AWorldChunk*>& Pair : ActiveChunks)
 		{
-			ChunksToRemove.Add(Pair.Key);
+			if (!DesiredChunks.Contains(Pair.Key))
+			{
+				ChunksToRemove.Add(Pair.Key);
+			}
+		}
+
+		for (const FIntPoint& ChunkXY : ChunksToRemove)
+		{
+			DestroyChunkAt(ChunkXY);
+		}
+	}
+	else
+	{
+		FIntPoint SlidingCenter = LastChunkWindowCenter;
+
+		const int DeltaX = CenterChunk.X - LastChunkWindowCenter.X;
+		const int StepX = FMath::Sign(DeltaX);
+		for (int Step = 0; Step < FMath::Abs(DeltaX); ++Step)
+		{
+			if (StepX > 0)
+			{
+				const int EnterX = SlidingCenter.X + RenderDistance + 1;
+				const int ExitX = SlidingCenter.X - RenderDistance;
+				for (int Y = SlidingCenter.Y - RenderDistance; Y <= SlidingCenter.Y + RenderDistance; ++Y)
+				{
+					QueueChunkIfNeeded(FIntPoint(EnterX, Y));
+					FIntPoint ExitChunk = FIntPoint(ExitX, Y);
+					if (ActiveChunks.Find(ExitChunk))
+					{
+						DestroyChunkAt(ExitChunk);
+					}
+				}
+			}
+			else
+			{
+				const int EnterX = SlidingCenter.X - RenderDistance - 1;
+				const int ExitX = SlidingCenter.X + RenderDistance;
+
+				for (int Y = SlidingCenter.Y - RenderDistance; Y <= SlidingCenter.Y + RenderDistance; ++Y)
+				{
+					QueueChunkIfNeeded(FIntPoint(EnterX, Y));
+					FIntPoint ExitChunk = FIntPoint(ExitX, Y);
+					if (ActiveChunks.Find(ExitChunk))
+					{
+						DestroyChunkAt(ExitChunk);
+					}
+				}
+			}
+
+			SlidingCenter.X += StepX;
+		}
+
+		const int DeltaY = CenterChunk.Y - LastChunkWindowCenter.Y;
+		const int StepY = FMath::Sign(DeltaY);
+		for (int Step = 0; Step < FMath::Abs(DeltaY); ++Step)
+		{
+			if (StepY > 0)
+			{
+				const int EnterY = SlidingCenter.Y + RenderDistance + 1;
+				const int ExitY = SlidingCenter.Y - RenderDistance;
+				for (int X = SlidingCenter.X - RenderDistance; X <= SlidingCenter.X + RenderDistance; ++X)
+				{
+					QueueChunkIfNeeded(FIntPoint(X, EnterY));
+					FIntPoint ExitChunk = FIntPoint(X, ExitY);
+					if (ActiveChunks.Find(ExitChunk))
+					{
+						DestroyChunkAt(ExitChunk);
+					}
+				}
+			}
+			else
+			{
+				const int EnterY = SlidingCenter.Y - RenderDistance - 1;
+				const int ExitY = SlidingCenter.Y + RenderDistance;
+				for (int X = SlidingCenter.X - RenderDistance; X <= SlidingCenter.X + RenderDistance; ++X)
+				{
+					QueueChunkIfNeeded(FIntPoint(X, EnterY));
+					FIntPoint ExitChunk = FIntPoint(X, ExitY);
+					if (ActiveChunks.Find(ExitChunk))
+					{
+						DestroyChunkAt(ExitChunk);
+					}
+				}
+			}
+			SlidingCenter.Y += StepY;
 		}
 	}
 
-	for (const FIntPoint& ChunkXY : ChunksToRemove)
-	{
-		DestroyChunkAt(ChunkXY);
-	}
+	LastChunkWindowCenter = CenterChunk;
+	isChunkWindowInitialized = true;
+
+	// Determine which chunks should be active
+	//TSet<FIntPoint> DesiredChunks;
+	//TArray<FIntPoint> ChunksToSpawn;
+	//ChunksToSpawn.Empty();
+
+	//for (int DX = -RenderDistance; DX <= RenderDistance; ++DX)
+	//{
+	//	for (int DY = -RenderDistance; DY <= RenderDistance; ++DY)
+	//	{
+	//		FIntPoint ChunkXY = FIntPoint(CenterChunk.X + DX, CenterChunk.Y + DY);
+	//		DesiredChunks.Add(ChunkXY);
+
+	//		if (!ActiveChunks.Find(ChunkXY))
+	//		{
+	//			ChunkRegisterQueue.Add(ChunkXY);
+	//		}
+	//	}
+	//}
+
+	//// Destroy chunks that are no longer needed
+	//TArray<FIntPoint> ChunksToRemove;
+
+	//for (auto& Pair : ActiveChunks)
+	//{
+	//	if (!DesiredChunks.Contains(Pair.Key))
+	//	{
+	//		ChunksToRemove.Add(Pair.Key);
+	//	}
+	//}
+
+	//for (const FIntPoint& ChunkXY : ChunksToRemove)
+	//{
+	//	DestroyChunkAt(ChunkXY);
+	//}
 
 	/*UE_LOG(LogTemp, Warning, TEXT("Active chunks: %d"), ActiveChunks.Num());*/
 }

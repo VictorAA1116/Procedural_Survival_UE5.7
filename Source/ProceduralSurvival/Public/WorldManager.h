@@ -146,6 +146,8 @@ private:
 
 	// Current center chunk coordinates based on player position
 	FIntPoint CenterChunk = FIntPoint::ZeroValue;
+	FIntPoint LastChunkWindowCenter = FIntPoint::ZeroValue;
+	bool isChunkWindowInitialized = false;
 
 	TArray<FIntPoint> LODQueue;
 	TMap<FIntPoint, int32> PendingLOD;
