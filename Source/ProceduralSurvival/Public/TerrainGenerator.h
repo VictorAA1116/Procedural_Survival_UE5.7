@@ -4,25 +4,26 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
+#include "BiomeData.h"
 #include "TerrainGenerator.generated.h"
 
-UENUM(BlueprintType)
-enum class EBiomeType : uint8
-{
-	Plains UMETA(DisplayName = "Plains"),
-	Hills UMETA(DisplayName = "Hills"),
-	Mountains UMETA(DisplayName = "Mountain")
-};
+//UENUM(BlueprintType)
+//enum class EBiomeType : uint8
+//{
+//	Plains UMETA(DisplayName = "Plains"),
+//	Hills UMETA(DisplayName = "Hills"),
+//	Mountains UMETA(DisplayName = "Mountain")
+//};
 
-USTRUCT()
-struct FBiomeWeights
-{
-	GENERATED_BODY()
-
-	float Plains = 0.0f;
-	float Hills = 0.0f;
-	float Mountains = 0.0f;
-};
+//USTRUCT()
+//struct FBiomeWeights
+//{
+//	GENERATED_BODY()
+//
+//	float Plains = 0.0f;
+//	float Hills = 0.0f;
+//	float Mountains = 0.0f;
+//};
 
 UCLASS(Blueprintable, BlueprintType)
 class PROCEDURALSURVIVAL_API UTerrainGenerator : public UObject
