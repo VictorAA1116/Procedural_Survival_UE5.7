@@ -1,6 +1,4 @@
 // Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "TimeOfDayManager.h"
 #include "Engine/DirectionalLight.h"
 #include "Components/LightComponent.h"
@@ -12,7 +10,6 @@ ATimeOfDayManager::ATimeOfDayManager()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-
 }
 
 // Called when the game starts or when spawned
@@ -103,6 +100,7 @@ void ATimeOfDayManager::SetTime(float NewTimeInHours)
 	UpdateTime();
 	UpdateSunAndMoon();
 }
+
 
 FString ATimeOfDayManager::GetTime(bool Use24HFormat, bool IncludeSeconds) const
 {
