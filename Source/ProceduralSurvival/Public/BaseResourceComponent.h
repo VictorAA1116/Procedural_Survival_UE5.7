@@ -58,7 +58,7 @@ protected:
 	
 	// Virtual functions for children to link their events to
 	virtual void OnResourceDepleted();
-	virtual void OnResourceChanged(bool bPositiveChange);
+	virtual void OnResourceChanged(const bool bPositiveChange);
 
 private:
 	FTimerHandle RegenTimerHandle;

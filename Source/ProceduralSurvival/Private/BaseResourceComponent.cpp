@@ -132,12 +132,14 @@ float UBaseResourceComponent::GetPercent() const
 	return CurrentValue / static_cast<float>(MaxValue);
 }
 
+// Called when the resource is fully depleted
 void UBaseResourceComponent::OnResourceDepleted()
 {
 	// To be overridden by children
 }
 
-void UBaseResourceComponent::OnResourceChanged(bool bPositiveChange)
+// Called any time the resource's current value changes
+void UBaseResourceComponent::OnResourceChanged(const bool bPositiveChange)
 {
 	// To be overridden by children
 }

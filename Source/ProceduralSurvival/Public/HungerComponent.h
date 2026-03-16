@@ -39,6 +39,6 @@ public:
 protected:
 	
 	virtual void OnResourceDepleted() override;
-	virtual void OnResourceChanged(bool bPositiveChange) override;
+	virtual void OnResourceChanged(const bool bPositiveChange) override;
 	
 };
