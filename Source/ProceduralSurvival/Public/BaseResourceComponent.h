@@ -6,8 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "BaseResourceComponent.generated.h"
 
-
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS()
 class PROCEDURALSURVIVAL_API UBaseResourceComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -15,34 +14,92 @@ class PROCEDURALSURVIVAL_API UBaseResourceComponent : public UActorComponent
 public:	
 	// Sets default values for this component's properties
 	UBaseResourceComponent();
+	
+	// Called every frame
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 	
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Resource)
+	// Resource Values
+	
+	// The current value of the resource, can be increased and decreased at runtime based on functions, events, or timers
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Resource")
 	int CurrentValue;
 	
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Resource)
-	int MaxValue;
+	// The maximum value that this resource can hold
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Resource")
+	int MaxValue = 100;
 	
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Resource)
-	int MinValue;
+	// The minimum value that this resource can hold. In most cases, this should be left at 0
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Resource")
+	int MinValue = 0;
 	
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Resource)
-	float RegenRate;
+	// Regeneration
 	
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Resource)
-	float DepleteRate;
+	// The time in seconds between increasing the resource's current value. Values below 0 disable regeneration
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Resource|Regeneration")
+	float RegenRate = -1;
+	
+	// The amount that the current value of the resource will regenerate by on every regeneration interval
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Resource|Regeneration")
+	int RegenAmount = 0;
+	
+	// Depletion
+	
+	// The time in seconds between decreasing the resource's current value. Values below 0 disable depletion
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Resource|Depletion")
+	float DepleteRate = -1;
+	
+	// The amount that the current value of the resource will deplete by on every depletion interval
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Resource|Depletion")
+	int DepleteAmount = 0;
+	
+	// Virtual functions for children to link their events to
+	virtual void OnResourceDepleted();
+	virtual void OnResourceChanged(bool bPositiveChange);
 
+private:
+	FTimerHandle RegenTimerHandle;
+	FTimerHandle DepleteTimerHandle;
+	
+	void RegenTick();
+	void DepleteTick();
+	
+	bool bWasDepleted = false;
+	
 public:	
-	// Called every frame
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	// Modifies the current value of the resource by the Delta Amount
+	UFUNCTION(BlueprintCallable, Category="Resource")
+	void ModifyCurrentValue(const int DeltaAmount);
 	
-	UFUNCTION(BlueprintCallable, Category=Resource)
-	void ModifyValue(const int DeltaAmount);
+	// Modifies the regeneration values and restarts the timer
+	UFUNCTION(BlueprintCallable, Category="Resource")
+	void ModifyRegeneration(const int NewRegenAmount, const float NewRegenRate);
 	
-	UFUNCTION(BlueprintCallable, Category=Resource)
+	// Modifies the depletion values and restarts the timer
+	UFUNCTION(BlueprintCallable, Category="Resource")
+	void ModifyDepletion(const int NewDepleteAmount, const float NewDepleteRate);
+	
+	// Starts the timer for regenerating the resource
+	UFUNCTION(BlueprintCallable, Category="Resource|Regeneration")
+	void StartRegenTimer();
+	
+	// Stops the timer for regenerating the resource
+	UFUNCTION(BlueprintCallable, Category="Resource|Regeneration")
+	void StopRegenTimer();
+	
+	// Starts the timer for depleting the resource
+	UFUNCTION(BlueprintCallable, Category="Resource|Depletion")
+	void StartDepletionTimer();
+	
+	// Stops the timer for depleting the resource
+	UFUNCTION(BlueprintCallable, Category="Resource|Depletion")
+	void StopDepletionTimer();
+	
+	// Returns the percentage of the current value relative to the max value as a float
+	UFUNCTION(BlueprintCallable, Category="Resource")
 	float GetPercent() const;
 	
 };
