@@ -35,6 +35,10 @@ public:
 	// Increases the current hunger by the Refill Amount. Only positive numbers should be used
 	UFUNCTION(BlueprintCallable)
 	void RefillHunger(const int RefillAmount);
+	
+	// The stamina value below which the owner of this component will be unable to sprint
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int SprintThresholdValue = 25;
 
 protected:
 	

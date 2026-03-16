@@ -10,7 +10,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaExhausted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaDrained);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaRefilled);
 
-UCLASS()
+UCLASS( ClassGroup=(Survival), meta=(BlueprintSpawnableComponent) )
 class PROCEDURALSURVIVAL_API UStaminaComponent : public UBaseResourceComponent
 {
 	GENERATED_BODY()
@@ -37,7 +37,7 @@ public:
 	void RefillStamina(const int RefillAmount);
 	
 	// Whether the owner of this component is allowed to sprint or not. This is automatically updated
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool bCanSprint = true;
 	
 protected:
