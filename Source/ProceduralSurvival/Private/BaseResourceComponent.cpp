@@ -30,7 +30,7 @@ void UBaseResourceComponent::StartRegenTimer()
 {
 	StopRegenTimer();
 	
-	if (RegenRate < 0) return;
+	if (RegenRate < 0 || !bIsRegenerating) return;
 	
 	GetWorld()->GetTimerManager().SetTimer(
 		RegenTimerHandle,
@@ -56,12 +56,20 @@ void UBaseResourceComponent::StopRegenTimer()
 }
 
 // Updates the values of RegenAmount and RegenRate and restarts the timer with these new values
-void UBaseResourceComponent::ModifyRegeneration(const int NewRegenAmount, const float NewRegenRate)
+void UBaseResourceComponent::ModifyRegeneration(const int NewRegenAmount, const float NewRegenRate, const bool bNewIsRegenerating)
 {
 	RegenAmount = NewRegenAmount;
 	RegenRate = NewRegenRate;
+	bIsRegenerating = bNewIsRegenerating;
 	
-	StartRegenTimer();
+	if (bIsRegenerating)
+	{
+		StartRegenTimer();
+	}
+	else
+	{
+		StopRegenTimer();
+	}
 }
 
 // Clears any previous depletion timer in the handle and starts a new timer if the rate is a positive value
@@ -69,7 +77,7 @@ void UBaseResourceComponent::StartDepletionTimer()
 {
 	StopDepletionTimer();
 	
-	if (DepleteRate < 0) return;
+	if (DepleteRate < 0 || !bIsDepleting) return;
 	
 	GetWorld()->GetTimerManager().SetTimer(
 		DepleteTimerHandle,
@@ -85,7 +93,8 @@ void UBaseResourceComponent::DepleteTick()
 {
 	if (CurrentValue <= MinValue) return;
 	
-	ModifyCurrentValue(DepleteAmount);
+	// Negate deplete amount for subtraction
+	ModifyCurrentValue(-DepleteAmount);
 }
 
 // Stops and clears the timer for depletion
@@ -95,22 +104,33 @@ void UBaseResourceComponent::StopDepletionTimer()
 }
 
 // Updates the values of DepleteAmount and DepleteRate and restarts the timer with these new values
-void UBaseResourceComponent::ModifyDepletion(const int NewDepleteAmount, const float NewDepleteRate)
+void UBaseResourceComponent::ModifyDepletion(const int NewDepleteAmount, const float NewDepleteRate, const bool bNewIsDepleting)
 {
 	DepleteAmount = NewDepleteAmount;
 	DepleteRate = NewDepleteRate;
+	bIsDepleting = bNewIsDepleting;
 	
-	StartDepletionTimer();
+	if (bIsDepleting)
+	{
+		StartDepletionTimer();
+	}
+	else
+	{
+		StopDepletionTimer();
+	}
 }
 
 // To be called by children when they deem appropriate
 void UBaseResourceComponent::ModifyCurrentValue(const int DeltaAmount)
 {
-	// Modifies the CurrentValue by adding the Delta Amount and clamping to Min and Max Values
-	CurrentValue = FMath::Clamp(CurrentValue + DeltaAmount, MinValue, MaxValue);
-	
-	// Broadcast Event
-	OnResourceChanged(DeltaAmount > 0);
+	const int PreviousValue = CurrentValue;
+	const int NewValue = FMath::Clamp(PreviousValue + DeltaAmount, MinValue, MaxValue);
+
+	// Skip notifications when clamp prevents any actual value change.
+	if (NewValue == PreviousValue) return;
+
+	CurrentValue = NewValue;
+	OnResourceChanged(NewValue > PreviousValue);
 	
 	// Call virtual function for children to override
 	if (!bWasDepleted && CurrentValue <= MinValue)

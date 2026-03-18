@@ -46,6 +46,9 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Resource|Regeneration")
 	int RegenAmount = 0;
 	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Resource|Regeneration")
+	bool bIsRegenerating = false;
+	
 	// Depletion
 	
 	// The time in seconds between decreasing the resource's current value. Values below 0 disable depletion
@@ -55,6 +58,9 @@ protected:
 	// The amount that the current value of the resource will deplete by on every depletion interval
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Resource|Depletion")
 	int DepleteAmount = 0;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Resource|Depletion")
+	bool bIsDepleting = false;
 	
 	// Virtual functions for children to link their events to
 	virtual void OnResourceDepleted();
@@ -76,11 +82,11 @@ public:
 	
 	// Modifies the regeneration values and restarts the timer
 	UFUNCTION(BlueprintCallable, Category="Resource")
-	void ModifyRegeneration(const int NewRegenAmount, const float NewRegenRate);
+	void ModifyRegeneration(const int NewRegenAmount, const float NewRegenRate, const bool bNewIsRegenerating);
 	
 	// Modifies the depletion values and restarts the timer
 	UFUNCTION(BlueprintCallable, Category="Resource")
-	void ModifyDepletion(const int NewDepleteAmount, const float NewDepleteRate);
+	void ModifyDepletion(const int NewDepleteAmount, const float NewDepleteRate, const bool bNewIsDepleting);
 	
 	// Starts the timer for regenerating the resource
 	UFUNCTION(BlueprintCallable, Category="Resource|Regeneration")

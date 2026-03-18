@@ -23,7 +23,7 @@ void UStaminaComponent::OnResourceDepleted()
 		bCanSprint = false;
 	}
 	
-	OnStaminaDrained.Broadcast();
+	OnStaminaExhausted.Broadcast();
 }
 
 
