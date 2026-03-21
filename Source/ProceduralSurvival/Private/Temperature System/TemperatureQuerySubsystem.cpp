@@ -51,11 +51,28 @@ void UTemperatureQuerySubsystem::GatherModifiersAtLocation(FVector Location, TAr
 	TArray<AActor*> AllActors;
 	UGameplayStatics::GetAllActorsWithInterface(GetWorld(), UTempModifierInterface::StaticClass(), AllActors);
 	
-	// for (AActor* Actor : AllActors)
-	// {
-	// 	if (Actor->IsOverlappingActor(nullptr))
-	// 	{
-	// 		OutActors.Add(Actor);
-	// 	}
-	// }
+	for (AActor* Actor : AllActors)
+	{
+		if (!Actor) continue;
+		
+		// Check if the actor is a volume
+		if (AVolume* Volume = Cast<AVolume>(Actor))
+		{
+			if (Volume->EncompassesPoint(Location))
+			{
+				OutActors.Add(Actor);
+			}
+		}
+		else
+		{
+			const float Distance = FVector::Dist(Location, Actor->GetActorLocation());
+			
+			const float MaxRange = 500.0f;
+			
+			if (Distance <= MaxRange)
+			{
+				OutActors.Add(Actor);
+			}
+		}
+	}
 }
