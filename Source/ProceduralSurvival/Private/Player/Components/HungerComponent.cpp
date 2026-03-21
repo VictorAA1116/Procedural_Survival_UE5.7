@@ -1,6 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "HungerComponent.h"
+#include "Player/Components/HungerComponent.h"
 
 // Calls BaseResourceComponent's function to modify the current hunger value
 void UHungerComponent::DrainHunger(const int DrainAmount)

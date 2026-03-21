@@ -74,6 +74,9 @@ public:
 	// Returns the current in-game time as a formatted string for UI Use
 	UFUNCTION(BlueprintCallable, Category = "TimeOfDay")
 	FString GetTime(bool Use24HFormat = true, bool IncludeSeconds = true) const;
+	
+	UFUNCTION(BlueprintCallable, Category = "TimeOfDay")
+	float GetTimeNormalized() const;
 
 protected:
 	// Called when the game starts or when spawned

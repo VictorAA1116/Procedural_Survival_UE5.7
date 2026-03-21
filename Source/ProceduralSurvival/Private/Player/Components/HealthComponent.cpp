@@ -1,6 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "HealthComponent.h"
+#include "Player/Components/HealthComponent.h"
 
 // Calls BaseResourceComponent's function to modify the current health value
 void UHealthComponent::ApplyDamage(const int DamageAmount)

@@ -1,6 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "StaminaComponent.h"
+#include "Player/Components/StaminaComponent.h"
 
 // Calls BaseResourceComponent's function to modify the current stamina value
 void UStaminaComponent::DrainStamina(const int DrainAmount)

@@ -6,6 +6,7 @@
 #include "Components/LightComponent.h"
 #include "Math/UnrealMathUtility.h"
 #include "Misc/Timespan.h"
+#include "Temperature System/TemperatureSubsystem.h"
 
 // Sets default values
 ATimeOfDayManager::ATimeOfDayManager()
@@ -19,7 +20,13 @@ ATimeOfDayManager::ATimeOfDayManager()
 void ATimeOfDayManager::BeginPlay()
 {
 	Super::BeginPlay();
+	
 	SetTime(StartTime);
+	
+	if (UTemperatureSubsystem* TempSubsystem = GetWorld()->GetSubsystem<UTemperatureSubsystem>())
+	{
+		TempSubsystem->SetTimeOfDayManager(this);
+	}
 }
 
 // Called every frame
@@ -129,4 +136,11 @@ FString ATimeOfDayManager::GetTime(bool Use24HFormat, bool IncludeSeconds) const
 		FString::Printf(TEXT("%02d:%02d%s"), DisplayHours, Minutes, *Suffix);
 
 	return TimeString;
+}
+
+float ATimeOfDayManager::GetTimeNormalized() const
+{
+	const float NormalizedTime = CurrentTime / DayLength;
+	
+	return NormalizedTime;
 }
