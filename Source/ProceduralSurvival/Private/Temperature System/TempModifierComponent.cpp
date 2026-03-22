@@ -14,9 +14,6 @@ UTempModifierComponent::UTempModifierComponent()
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = false;
-	
-	BoxComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("TemperatureModifierBox"));
-	//BoxComponent->SetupAttachment(GetOwner()->GetRootComponent());
 }
 
 
@@ -32,6 +29,15 @@ void UTempModifierComponent::BeginPlay()
 	if (TemperatureManager)
 	{
 		TemperatureManager->RegisterModifier(this);
+	}
+	
+	if (!BoxComponent)
+	{
+		BoxComponent = GetOwner()->FindComponentByClass<UBoxComponent>();
+		if (!BoxComponent)
+		{
+			UE_LOG(LogTemp, Error, TEXT("No BoxComponent found"));
+		}
 	}
 }
 
@@ -50,7 +56,7 @@ bool UTempModifierComponent::IsPointInside(FVector Point) const
 {
 	if (!BoxComponent) return false;
 	
-	return BoxComponent->IsOverlappingComponent(nullptr) || BoxComponent->Bounds.GetBox().IsInside(Point);
+	return BoxComponent->Bounds.GetBox().IsInside(Point);
 }
 
 float UTempModifierComponent::ApplyTemperature(float CurrentTemp) const

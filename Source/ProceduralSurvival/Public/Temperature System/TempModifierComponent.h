@@ -38,7 +38,7 @@ public:
 protected:
 	
 	// Box component used to define the bounds of the temperature modifier volume. The player must be inside this box to be affected by the temperature changes.
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Temperature", meta=(AllowPrivateAccess=true))
 	UBoxComponent* BoxComponent;
 	
 	// The method that the Temperature Value will be applied with. Additive will add the Temperature Value to the ambient temp. Blend will blend between the ambient temp and the Temperature Value based on the Blend Alpha. Override will simply ignore ambient temperatures and apply the Temperature Value exactly.
