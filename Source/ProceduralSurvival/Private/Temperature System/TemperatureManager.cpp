@@ -2,7 +2,7 @@
 
 
 #include "Temperature System/TemperatureManager.h"
-
+#include "Temperature System/TempModifierComponent.h"
 #include "TimeOfDayManager.h"
 
 // Sets default values
@@ -41,7 +41,7 @@ float ATemperatureManager::GetTemperatureAtLocation(FVector Location) const
 	{
 		if (!Modifier) continue;
 		
-		if (Modifier->IsPointIside(Location))
+		if (Modifier->IsPointInside(Location))
 		{
 			Temperature = Modifier->ApplyTemperature(Temperature);
 		}
@@ -58,4 +58,9 @@ void ATemperatureManager::RegisterModifier(UTempModifierComponent* Modifier)
 void ATemperatureManager::UnregisterModifier(UTempModifierComponent* Modifier)
 {
 	Modifiers.Remove(Modifier);
+}
+
+void ATemperatureManager::SetTimeOfDayManager(ATimeOfDayManager* InTODManager)
+{
+	TimeOfDayManager = InTODManager;
 }

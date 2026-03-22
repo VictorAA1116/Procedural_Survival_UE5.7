@@ -25,6 +25,8 @@ public:
 	
 	void RegisterModifier(UTempModifierComponent* Modifier);
 	void UnregisterModifier(UTempModifierComponent* Modifier);
+	
+	void SetTimeOfDayManager(ATimeOfDayManager* InTODManager);
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Temperature")

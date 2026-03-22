@@ -1,7 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Player/Components/TemperatureComponent.h"
-#include "Temperature System/TemperatureQuerySubsystem.h"
+#include "Temperature System/TemperatureManager.h"
+#include "Kismet/GameplayStatics.h"
 
 // Sets default values for this component's properties
 UTemperatureComponent::UTemperatureComponent()
@@ -19,7 +20,7 @@ void UTemperatureComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	QuerySubsystem = GetWorld()->GetSubsystem<UTemperatureQuerySubsystem>();
+	TemperatureManager = Cast<ATemperatureManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ATemperatureManager::StaticClass()));
 }
 
 
@@ -28,10 +29,10 @@ void UTemperatureComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (!QuerySubsystem) return;
+	if (!TemperatureManager) return;
 	
 	FVector Location = GetOwner()->GetActorLocation();
-	float EnvironmentTemp = QuerySubsystem->GetTemperatureAtLocation(Location);
+	float EnvironmentTemp = TemperatureManager->GetTemperatureAtLocation(Location);
 	
 	float EffectiveTemp = CalculateEffectiveTemperature(EnvironmentTemp);
 	

@@ -4,9 +4,10 @@
 #include "TimeOfDayManager.h"
 #include "Engine/DirectionalLight.h"
 #include "Components/LightComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Math/UnrealMathUtility.h"
 #include "Misc/Timespan.h"
-#include "Temperature System/TemperatureSubsystem.h"
+#include "Temperature System/TemperatureManager.h"
 
 // Sets default values
 ATimeOfDayManager::ATimeOfDayManager()
@@ -23,9 +24,9 @@ void ATimeOfDayManager::BeginPlay()
 	
 	SetTime(StartTime);
 	
-	if (UTemperatureSubsystem* TempSubsystem = GetWorld()->GetSubsystem<UTemperatureSubsystem>())
+	if (ATemperatureManager* TemperatureManager = Cast<ATemperatureManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ATemperatureManager::StaticClass())))
 	{
-		TempSubsystem->SetTimeOfDayManager(this);
+		TemperatureManager->SetTimeOfDayManager(this);
 	}
 }
 

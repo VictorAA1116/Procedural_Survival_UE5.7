@@ -6,7 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "TemperatureComponent.generated.h"
 
-class UTemperatureQuerySubsystem;
+class ATemperatureManager;
 
 UCLASS( ClassGroup=(Survival), meta=(BlueprintSpawnableComponent) )
 class PROCEDURALSURVIVAL_API UTemperatureComponent : public UActorComponent
@@ -37,7 +37,7 @@ protected:
 	float Insulation = 0.5f;
 
 private:
-	UTemperatureQuerySubsystem* QuerySubsystem;
+	ATemperatureManager* TemperatureManager;
 	
 	float CalculateEffectiveTemperature(float EnvironmentTemp) const;
 	
