@@ -27,9 +27,7 @@ void ATemperatureManager::SetGlobalTemperature() const
 		return;
 	}
 	
-	const float Time = TimeOfDayManager->GetTimeNormalized();
-	
-	GlobalTemperatureKelvin = TemperatureOverTimeOfDay->GetFloatValue(Time);
+	GlobalTemperatureKelvin = TemperatureOverTimeOfDay->GetFloatValue(TimeOfDayManager->CurrentTime);
 }
 
 float ATemperatureManager::GetTemperatureAtLocation(FVector Location) const

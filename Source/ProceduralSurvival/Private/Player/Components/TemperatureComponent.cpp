@@ -28,15 +28,29 @@ void UTemperatureComponent::BeginPlay()
 void UTemperatureComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	if (!TemperatureManager) return;
 	
-	FVector Location = GetOwner()->GetActorLocation();
-	float EnvironmentTemp = TemperatureManager->GetTemperatureAtLocation(Location);
+	float EnvironmentTemp = GetAmbientTemperatureKelvin();
 	
 	float EffectiveTemp = CalculateEffectiveTemperature(EnvironmentTemp);
 	
 	BodyTemperature = FMath::FInterpTo(BodyTemperature, EffectiveTemp, DeltaTime, HeatTransferRate);
+}
+
+float UTemperatureComponent::GetAmbientTemperatureKelvin() const
+{
+	if (!TemperatureManager) return 0.0f;
+	
+	return TemperatureManager->GetTemperatureAtLocation(GetOwner()->GetActorLocation());
+}
+
+float UTemperatureComponent::GetAmbientTemperatureCelsius() const
+{
+	return GetAmbientTemperatureKelvin() - 273.15f;
+}
+
+float UTemperatureComponent::GetAmbientTemperatureFahrenheit() const
+{
+	return GetAmbientTemperatureCelsius() * 9.0f / 5.0f + 32.0f;
 }
 
 float UTemperatureComponent::CalculateEffectiveTemperature(float EnvironmentTemp) const

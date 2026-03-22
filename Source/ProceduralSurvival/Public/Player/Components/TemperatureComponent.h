@@ -22,7 +22,24 @@ public:
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	
-	float GetBodyTemperature() const { return BodyTemperature; }
+	UFUNCTION( BlueprintCallable, Category = "Temperature" )
+	float GetBodyTemperatureKelvin() const { return BodyTemperature; }
+	
+	UFUNCTION( BlueprintCallable, Category = "Temperature" )
+	float GetBodyTemperatureCelsius() const { return BodyTemperature - 273.15f; }
+	
+	UFUNCTION( BlueprintCallable, Category = "Temperature" )
+	float GetBodyTemperatureFahrenheit() const { return GetBodyTemperatureCelsius() * 9.0f/5.0f + 32.0f; }
+	
+	UFUNCTION( BlueprintCallable, Category = "Temperature" )
+	float GetAmbientTemperatureKelvin() const;
+	
+	UFUNCTION( BlueprintCallable, Category = "Temperature" )
+	float GetAmbientTemperatureCelsius() const;
+	
+	UFUNCTION( BlueprintCallable, Category = "Temperature" )
+	float GetAmbientTemperatureFahrenheit() const;
+	
 
 protected:
 	
