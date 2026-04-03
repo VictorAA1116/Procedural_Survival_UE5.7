@@ -10,10 +10,10 @@ struct FItemStack
 	GENERATED_BODY()
 	
 public:
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	UItemData* ItemData = nullptr;
 	
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 Quantity = 0;
 	
 	bool IsValid() const

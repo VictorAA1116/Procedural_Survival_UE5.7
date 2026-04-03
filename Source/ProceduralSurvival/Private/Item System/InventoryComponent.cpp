@@ -18,7 +18,7 @@ void UInventoryComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// ...
+	Items.SetNum(NumSlots);
 }
 
 
@@ -88,5 +88,28 @@ bool UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
 	}
 	
 	return false;
+}
+
+int32 UInventoryComponent::GetNumSlots() const
+{
+	return NumSlots;
+}
+
+FItemStack UInventoryComponent::GetItemAtIndex(int32 Index) const
+{
+	if (Items.IsValidIndex(Index))
+	{
+		return Items[Index];
+	}
+	
+	return FItemStack(); // Return empty if index is not valid
+}
+
+bool UInventoryComponent::IsSlotEmpty(int32 Index) const
+{
+	if (!Items.IsValidIndex(Index)) return true;
+	
+	// If item is valid, return not empty
+	return !Items[Index].IsValid();
 }
 

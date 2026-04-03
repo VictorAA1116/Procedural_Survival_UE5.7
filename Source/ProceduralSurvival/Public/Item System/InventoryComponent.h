@@ -38,6 +38,24 @@ public:
 	
 	// Attempts to remove an item from the inventory, returns true if successful and false if not.
 	bool RemoveItem(UItemData* Item, int32 Quantity);
+	
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	int32 GetNumSlots() const;
+	
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	FItemStack GetItemAtIndex(int32 Index) const;
+	
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool IsSlotEmpty(int32 Index) const;
+	
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	TArray<FItemStack> GetFullInventory() { return Items; }
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 NumRows;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 NumColumns;
 
 protected:
 	UPROPERTY(EditAnywhere)
