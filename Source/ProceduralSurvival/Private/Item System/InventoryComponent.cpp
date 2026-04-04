@@ -44,23 +44,30 @@ bool UInventoryComponent::AddItem(UItemData* Item, int32 Quantity)
 			Stack.Quantity += ToAdd;
 			Quantity -= ToAdd;
 			
-			if (Quantity <= 0) return true;
+			if (Quantity <= 0)
+			{
+				FOnItemAdded.Broadcast();
+				return true;
+			}
+		}
+		
+		if (!Stack.IsValid())
+		{
+			int32 ToAdd = FMath::Min(Item->MaxStackSize, Quantity);
+			Stack.ItemData = Item;
+			Stack.Quantity = ToAdd;
+			
+			Quantity -= ToAdd;
+			
+			if (Quantity <= 0)
+			{
+				FOnItemAdded.Broadcast();
+				return true;
+			}
 		}
 	}
 	
-	while (Quantity > 0 && Items.Num() < NumSlots)
-	{
-		const int32 ToAdd = FMath::Min(Item->MaxStackSize, Quantity);
-		
-		FItemStack NewStack;
-		NewStack.ItemData = Item;
-		NewStack.Quantity = ToAdd;
-		
-		Items.Add(NewStack);
-		Quantity -= ToAdd;
-	}
-	
-	return Quantity <= 0;
+	return false;
 }
 
 bool UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
@@ -80,7 +87,8 @@ bool UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
 			
 			if (Stack.Quantity <= 0)
 			{
-				Items.RemoveAt(i);
+				Stack = FItemStack();
+				FOnItemRemoved.Broadcast();
 			}
 			
 			if (Quantity <= 0) return true;
@@ -88,6 +96,43 @@ bool UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
 	}
 	
 	return false;
+}
+
+bool UInventoryComponent::AddItemAtIndex(UItemData* Item, int32 Quantity, int32 Index)
+{
+	if (!Item || Quantity <= 0 || !Items.IsValidIndex(Index)) return false;
+	
+	if (Items[Index].ItemData == Item)
+	{
+		int32 SpaceLeft = Item->MaxStackSize - Items[Index].Quantity;
+		int32 ToAdd = FMath::Min(SpaceLeft, Quantity);
+		
+		Items[Index].Quantity += ToAdd;
+		Quantity -= ToAdd;
+		
+		if (Quantity <= 0) return true;
+	}
+	else if (Items[Index].Quantity == 0 && Quantity <= Item->MaxStackSize)
+	{
+		FItemStack NewStack;
+		NewStack.ItemData = Item;
+		NewStack.Quantity = Quantity;
+		
+		Items[Index] = NewStack;
+		Quantity -= Items[Index].Quantity;
+		
+		if (Quantity <= 0) return true;
+	}
+	
+	return false;
+}
+
+bool UInventoryComponent::RemoveItemAtIndex(UItemData* Item, int32 Quantity, int32 Index)
+{
+	if (!Item || Quantity <= 0 || !Items.IsValidIndex(Index)) return false;
+	
+	Items[Index] = FItemStack();
+	return true;
 }
 
 int32 UInventoryComponent::GetNumSlots() const

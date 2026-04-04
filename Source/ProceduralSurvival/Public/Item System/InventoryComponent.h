@@ -42,6 +42,12 @@ public:
 	bool RemoveItem(UItemData* Item, int32 Quantity);
 	
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool AddItemAtIndex(UItemData* Item, int32 Quantity, int32 Index);
+	
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool RemoveItemAtIndex(UItemData* Item, int32 Quantity, int32 Index);
+	
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	int32 GetNumSlots() const;
 	
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
