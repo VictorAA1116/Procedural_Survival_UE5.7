@@ -34,9 +34,11 @@ public:
 	FOnItemRemoved FOnItemRemoved;
 	
 	// Attempts to add an item to the inventory, returns true if successful and false if not.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool AddItem(UItemData* Item, int32 Quantity);
 	
 	// Attempts to remove an item from the inventory, returns true if successful and false if not.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool RemoveItem(UItemData* Item, int32 Quantity);
 	
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
@@ -50,9 +52,6 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	TArray<FItemStack> GetFullInventory() { return Items; }
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 NumRows;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 NumColumns;
