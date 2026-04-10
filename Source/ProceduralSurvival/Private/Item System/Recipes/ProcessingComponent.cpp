@@ -14,25 +14,6 @@ UProcessingComponent::UProcessingComponent()
 	// ...
 }
 
-
-void UProcessingComponent::ProcessRecipe()
-{
-	if (!ActiveRecipe || !InputInventory || !OutputInventory) return;
-	
-	for (const FItemAmount& Input : ActiveRecipe->Inputs)
-	{
-		if (!InputInventory->RemoveItem(Input.ItemData, Input.Quantity))
-		{
-			return; // Not enough input items, abort processing
-		}
-	}
-	
-	for (const FItemAmount& Output : ActiveRecipe->Outputs)
-	{
-		OutputInventory->AddItem(Output.ItemData, Output.Quantity);
-	}
-}
-
 // Called when the game starts
 void UProcessingComponent::BeginPlay()
 {
@@ -51,6 +32,7 @@ void UProcessingComponent::BeginPlay()
 		if (Inventory->ComponentHasTag("Input"))
 		{
 			InputInventory = Inventory;
+			InputInventory->FOnInventoryChanged.AddDynamic(this, &UProcessingComponent::TrySetActiveRecipe);
 		}
 		else if (Inventory->ComponentHasTag("Output"))
 		{
@@ -65,11 +47,50 @@ void UProcessingComponent::BeginPlay()
 
 
 // Called every frame
-void UProcessingComponent::TickComponent(float DeltaTime, ELevelTick TickType,
-                                         FActorComponentTickFunction* ThisTickFunction)
+void UProcessingComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	// ...
+}
+
+
+void UProcessingComponent::TrySetActiveRecipe()
+{
+	if (InputInventory->GetFullInventory().Num() < 0 || PossibleRecipes.Num() <= 0) return;
+	
+	// Check if the input slots match any of the possible recipes, if so set that recipe as the active recipe
+	for (URecipeData* Recipe : PossibleRecipes)
+	{
+		for (FItemAmount& Input : Recipe->Inputs)
+		{
+			if (InputInventory->ContainsItem(Input.ItemData, Input.Quantity))
+			{
+				ActiveRecipe = Recipe;
+				return;
+			}
+		}
+	}
+	
+	// If no matches, set ActiveRecipe to null
+	ActiveRecipe = nullptr;
+}
+
+void UProcessingComponent::ProcessRecipe()
+{
+	if (!ActiveRecipe || !InputInventory || !OutputInventory) return;
+	
+	for (const FItemAmount& Input : ActiveRecipe->Inputs)
+	{
+		if (!InputInventory->RemoveItem(Input.ItemData, Input.Quantity))
+		{
+			return; // Not enough input items, abort processing
+		}
+	}
+	
+	for (const FItemAmount& Output : ActiveRecipe->Outputs)
+	{
+		OutputInventory->AddItem(Output.ItemData, Output.Quantity);
+	}
 }
 

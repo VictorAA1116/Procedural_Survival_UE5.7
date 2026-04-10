@@ -9,6 +9,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnItemAdded);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnItemRemoved);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryChanged);
 
 UCLASS(ClassGroup=(Survival), meta=(BlueprintSpawnableComponent))
 class PROCEDURALSURVIVAL_API UInventoryComponent : public UActorComponent
@@ -32,6 +33,10 @@ public:
 	// Called any time an item is removed from this inventory component
 	UPROPERTY(BlueprintAssignable)
 	FOnItemRemoved FOnItemRemoved;
+	
+	// Called any time an item is either added or removed from this inventory component
+	UPROPERTY(BlueprintAssignable)
+	FOnInventoryChanged FOnInventoryChanged;
 	
 	// Attempts to add an item to the inventory, returns true if successful and false if not.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
@@ -58,6 +63,9 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	TArray<FItemStack> GetFullInventory() { return Items; }
+	
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool ContainsItem(UItemData* Item, const int32 Quantity = 1) const;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 NumColumns;

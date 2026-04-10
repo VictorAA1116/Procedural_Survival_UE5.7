@@ -18,6 +18,9 @@ public:
 	// Sets default values for this component's properties
 	UProcessingComponent();
 	
+	// Called when the game starts
+	virtual void BeginPlay() override;
+	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	
@@ -28,13 +31,18 @@ public:
 	UInventoryComponent* OutputInventory;
 	
 	UPROPERTY(EditAnywhere)
+	TArray<URecipeData*> PossibleRecipes;
+	
 	URecipeData* ActiveRecipe;
+	
+	// Will refresh the active recipe based on
+	UFUNCTION(BlueprintCallable, Category = "Processing")
+	void TrySetActiveRecipe();
 	
 	void ProcessRecipe();
 
 protected:
-	// Called when the game starts
-	virtual void BeginPlay() override;
+	
 
 private:
 	
