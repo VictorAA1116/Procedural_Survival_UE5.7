@@ -47,7 +47,6 @@ bool UInventoryComponent::AddItem(UItemData* Item, int32 Quantity)
 			if (Quantity <= 0)
 			{
 				FOnItemAdded.Broadcast();
-				FOnInventoryChanged.Broadcast();
 				return true;
 			}
 		}
@@ -63,7 +62,6 @@ bool UInventoryComponent::AddItem(UItemData* Item, int32 Quantity)
 			if (Quantity <= 0)
 			{
 				FOnItemAdded.Broadcast();
-				FOnInventoryChanged.Broadcast();
 				return true;
 			}
 		}
@@ -91,7 +89,6 @@ bool UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
 			{
 				Stack = FItemStack();
 				FOnItemRemoved.Broadcast();
-				FOnInventoryChanged.Broadcast();
 			}
 			
 			if (Quantity <= 0) return true;
@@ -159,23 +156,5 @@ bool UInventoryComponent::IsSlotEmpty(int32 Index) const
 	
 	// If item is valid, return not empty
 	return !Items[Index].IsValid();
-}
-
-bool UInventoryComponent::ContainsItem(UItemData* Item, const int32 Quantity) const
-{
-	if (!Item || Quantity <= 0) return false;
-	
-	int32 TotalQuantity = 0;
-	
-	for (const FItemStack& Stack : Items)
-	{
-		if (Stack.ItemData == Item)
-		{
-			TotalQuantity += Stack.Quantity;
-			if (TotalQuantity >= Quantity) return true;
-		}
-	}
-	
-	return false;
 }
 
