@@ -29,11 +29,34 @@ void UTemperatureComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	
+	float InitialBodyTemp = BodyTemperature;
+	
 	float EnvironmentTemp = GetAmbientTemperatureKelvin();
 	
 	float EffectiveTemp = CalculateEffectiveTemperature(EnvironmentTemp);
 	
 	BodyTemperature = FMath::FInterpTo(BodyTemperature, EffectiveTemp, DeltaTime, HeatTransferRate);
+
+	if (InitialBodyTemp < BodyTemperature - 0.1f || InitialBodyTemp > BodyTemperature + 0.1f)
+	{
+		OnTemperatureChanged.Broadcast();
+	}
+	
+	if (BodyTemperature <= ColdDamageThresholdK && !bIsTemperatureExtreme)
+	{
+		OnExtremeCold.Broadcast();
+		bIsTemperatureExtreme = true;
+	}
+	else if (BodyTemperature >= HeatDamageThresholdK && !bIsTemperatureExtreme)
+	{
+		OnExtremeHeat.Broadcast();
+		bIsTemperatureExtreme = true;
+	}
+	else if (BodyTemperature > ColdDamageThresholdK && BodyTemperature < HeatDamageThresholdK && bIsTemperatureExtreme)
+	{
+		OnTemperatureNormalized.Broadcast();
+		bIsTemperatureExtreme = false;
+	}
 }
 
 float UTemperatureComponent::GetAmbientTemperatureKelvin() const
