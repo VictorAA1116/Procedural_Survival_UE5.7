@@ -9,6 +9,7 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaExhausted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaDrained);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaRefilled);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaCompletelyFull);
 
 UCLASS( ClassGroup=(Survival), meta=(BlueprintSpawnableComponent) )
 class PROCEDURALSURVIVAL_API UStaminaComponent : public UBaseResourceComponent
@@ -28,6 +29,10 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnStaminaRefilled OnStaminaRefilled;
 	
+	// Called when the stamina value is completely filled
+	UPROPERTY(BlueprintAssignable)
+	FOnStaminaCompletelyFull OnStaminaCompletelyFull;
+	
 	// Decreases the stamina value by Drain Amount. Only positive numbers should be used.
 	UFUNCTION(BlueprintCallable)
 	void DrainStamina(const int DrainAmount);
@@ -43,6 +48,7 @@ public:
 protected:
 	
 	virtual void OnResourceDepleted() override;
+	virtual void OnResourceCompletelyFilled() override;
 	virtual void OnResourceChanged(const bool bPositiveChange) override;
 	
 };

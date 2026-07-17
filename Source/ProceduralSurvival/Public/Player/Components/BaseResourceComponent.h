@@ -64,6 +64,7 @@ protected:
 	
 	// Virtual functions for children to link their events to
 	virtual void OnResourceDepleted();
+	virtual void OnResourceCompletelyFilled();
 	virtual void OnResourceChanged(const bool bPositiveChange);
 
 private:

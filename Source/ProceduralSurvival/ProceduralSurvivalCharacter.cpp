@@ -131,3 +131,8 @@ void AProceduralSurvivalCharacter::DoJumpEnd()
 	// signal the character to stop jumping
 	StopJumping();
 }
+
+bool AProceduralSurvivalCharacter::CanJumpInternal_Implementation() const
+{
+	return bCanJump && Super::CanJumpInternal_Implementation();
+}

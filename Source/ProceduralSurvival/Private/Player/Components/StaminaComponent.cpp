@@ -26,6 +26,11 @@ void UStaminaComponent::OnResourceDepleted()
 	OnStaminaExhausted.Broadcast();
 }
 
+void UStaminaComponent::OnResourceCompletelyFilled()
+{
+	OnStaminaCompletelyFull.Broadcast();
+}
+
 
 // Relays parent class's event to either the Refilled or Drained event for this class
 void UStaminaComponent::OnResourceChanged(const bool bPositiveChange)

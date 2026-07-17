@@ -158,6 +158,11 @@ void UBaseResourceComponent::OnResourceDepleted()
 	// To be overridden by children
 }
 
+void UBaseResourceComponent::OnResourceCompletelyFilled()
+{
+	// To be overridden by children
+}
+
 // Called any time the resource's current value changes
 void UBaseResourceComponent::OnResourceChanged(const bool bPositiveChange)
 {
