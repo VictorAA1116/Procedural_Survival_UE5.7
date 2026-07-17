@@ -38,13 +38,13 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnInventoryChanged FOnInventoryChanged;
 	
-	// Attempts to add an item to the inventory, returns true if successful and false if not.
+	// Attempts to add an item to the inventory, returns the number of items successfully added.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
-	bool AddItem(UItemData* Item, int32 Quantity);
+	int AddItem(UItemData* Item, int32 Quantity);
 	
-	// Attempts to remove an item from the inventory, returns true if successful and false if not.
+	// Attempts to remove an item from the inventory, returns the number of items successfully removed.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
-	bool RemoveItem(UItemData* Item, int32 Quantity);
+	int RemoveItem(UItemData* Item, int32 Quantity);
 	
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool AddItemAtIndex(UItemData* Item, int32 Quantity, int32 Index);
@@ -53,7 +53,10 @@ public:
 	bool RemoveItemAtIndex(UItemData* Item, int32 Quantity, int32 Index);
 	
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
-	int32 GetNumSlots() const;
+	int32 GetNumSlots() const { return NumInvSlots; }
+	
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	int32 GetNumHotbarSlots() const { return NumHotbarSlots; }
 	
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	FItemStack GetItemAtIndex(int32 Index) const;
@@ -62,20 +65,30 @@ public:
 	bool IsSlotEmpty(int32 Index) const;
 	
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
-	TArray<FItemStack> GetFullInventory() { return Items; }
+	TArray<FItemStack> GetFullInventory() { return InvItems; }
+	
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	TArray<FItemStack> GetHotbarItems() { return HotbarItems; }
 	
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool ContainsItem(UItemData* Item, const int32 Quantity = 1) const;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 NumColumns;
+	int32 NumInvColumns = 1;
 
 protected:
+	
 	UPROPERTY(EditAnywhere)
-	int32 NumSlots = 20;
+	int32 NumInvSlots = 20;
+	
+	UPROPERTY(EditAnywhere)
+	int32 NumHotbarSlots = 5;
 	
 	UPROPERTY(VisibleAnywhere)
-	TArray<FItemStack> Items;
+	TArray<FItemStack> InvItems;
+	
+	UPROPERTY(VisibleAnywhere)
+	TArray<FItemStack> HotbarItems;
 
 private:
 	

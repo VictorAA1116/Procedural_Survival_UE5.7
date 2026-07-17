@@ -18,7 +18,8 @@ void UInventoryComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	Items.SetNum(NumSlots);
+	InvItems.SetNum(NumInvSlots);
+	HotbarItems.SetNum(NumHotbarSlots);
 }
 
 
@@ -30,11 +31,13 @@ void UInventoryComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 	// ...
 }
 
-bool UInventoryComponent::AddItem(UItemData* Item, int32 Quantity)
+int UInventoryComponent::AddItem(UItemData* Item, int32 Quantity)
 {
 	if (!Item || Quantity <= 0) return false;
 	
-	for (FItemStack& Stack : Items)
+	int32 NumSuccessfullyAdded = 0;
+	
+	for (FItemStack& Stack : InvItems)
 	{
 		if (Stack.ItemData == Item && Stack.Quantity < Item->MaxStackSize)
 		{
@@ -42,13 +45,14 @@ bool UInventoryComponent::AddItem(UItemData* Item, int32 Quantity)
 			const int32 ToAdd = FMath::Min(SpaceLeft, Quantity);
 			
 			Stack.Quantity += ToAdd;
+			NumSuccessfullyAdded += ToAdd;
 			Quantity -= ToAdd;
 			
 			if (Quantity <= 0)
 			{
 				FOnItemAdded.Broadcast();
 				FOnInventoryChanged.Broadcast();
-				return true;
+				return NumSuccessfullyAdded;
 			}
 		}
 		
@@ -58,27 +62,64 @@ bool UInventoryComponent::AddItem(UItemData* Item, int32 Quantity)
 			Stack.ItemData = Item;
 			Stack.Quantity = ToAdd;
 			
+			NumSuccessfullyAdded += ToAdd;
 			Quantity -= ToAdd;
 			
 			if (Quantity <= 0)
 			{
 				FOnItemAdded.Broadcast();
 				FOnInventoryChanged.Broadcast();
-				return true;
+				return NumSuccessfullyAdded;
+			}
+		}
+	}
+	for (FItemStack& Stack : HotbarItems)
+	{
+		if (Stack.ItemData == Item && Stack.Quantity < Item->MaxStackSize)
+		{
+			const int32 SpaceLeft = Item->MaxStackSize - Stack.Quantity;
+			const int32 ToAdd = FMath::Min(SpaceLeft, Quantity);
+			
+			Stack.Quantity += ToAdd;
+			NumSuccessfullyAdded += ToAdd;
+			Quantity -= ToAdd;
+			
+			if (Quantity <= 0)
+			{
+				FOnItemAdded.Broadcast();
+				FOnInventoryChanged.Broadcast();
+				return NumSuccessfullyAdded;
+			}
+		}
+		
+		if (!Stack.IsValid())
+		{
+			int32 ToAdd = FMath::Min(Item->MaxStackSize, Quantity);
+			Stack.ItemData = Item;
+			Stack.Quantity = ToAdd;
+			
+			NumSuccessfullyAdded += ToAdd;
+			Quantity -= ToAdd;
+			
+			if (Quantity <= 0)
+			{
+				FOnItemAdded.Broadcast();
+				FOnInventoryChanged.Broadcast();
+				return NumSuccessfullyAdded;
 			}
 		}
 	}
 	
-	return false;
+	return 0;
 }
 
-bool UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
+int UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
 {
 	if (!Item || Quantity <= 0) return false;
 	
-	for (int32 i = Items.Num() - 1; i >= 0; i--)
+	for (int32 i = InvItems.Num() - 1; i >= 0; i--)
 	{
-		FItemStack& Stack = Items[i];
+		FItemStack& Stack = InvItems[i];
 		
 		if (Stack.ItemData == Item)
 		{
@@ -103,26 +144,26 @@ bool UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
 
 bool UInventoryComponent::AddItemAtIndex(UItemData* Item, int32 Quantity, int32 Index)
 {
-	if (!Item || Quantity <= 0 || !Items.IsValidIndex(Index)) return false;
+	if (!Item || Quantity <= 0 || !InvItems.IsValidIndex(Index)) return false;
 	
-	if (Items[Index].ItemData == Item)
+	if (InvItems[Index].ItemData == Item)
 	{
-		int32 SpaceLeft = Item->MaxStackSize - Items[Index].Quantity;
+		int32 SpaceLeft = Item->MaxStackSize - InvItems[Index].Quantity;
 		int32 ToAdd = FMath::Min(SpaceLeft, Quantity);
 		
-		Items[Index].Quantity += ToAdd;
+		InvItems[Index].Quantity += ToAdd;
 		Quantity -= ToAdd;
 		
 		if (Quantity <= 0) return true;
 	}
-	else if (Items[Index].Quantity == 0 && Quantity <= Item->MaxStackSize)
+	else if (InvItems[Index].Quantity == 0 && Quantity <= Item->MaxStackSize)
 	{
 		FItemStack NewStack;
 		NewStack.ItemData = Item;
 		NewStack.Quantity = Quantity;
 		
-		Items[Index] = NewStack;
-		Quantity -= Items[Index].Quantity;
+		InvItems[Index] = NewStack;
+		Quantity -= InvItems[Index].Quantity;
 		
 		if (Quantity <= 0) return true;
 	}
@@ -132,22 +173,21 @@ bool UInventoryComponent::AddItemAtIndex(UItemData* Item, int32 Quantity, int32 
 
 bool UInventoryComponent::RemoveItemAtIndex(UItemData* Item, int32 Quantity, int32 Index)
 {
-	if (!Item || Quantity <= 0 || !Items.IsValidIndex(Index)) return false;
+	if (!Item || Quantity <= 0 || !InvItems.IsValidIndex(Index)) return false;
 	
-	Items[Index] = FItemStack();
+	InvItems[Index] = FItemStack();
 	return true;
-}
-
-int32 UInventoryComponent::GetNumSlots() const
-{
-	return NumSlots;
 }
 
 FItemStack UInventoryComponent::GetItemAtIndex(int32 Index) const
 {
-	if (Items.IsValidIndex(Index))
+	if (InvItems.IsValidIndex(Index))
 	{
-		return Items[Index];
+		return InvItems[Index]; // Return item from main inventory
+	}
+	else if (Index >= NumInvSlots && Index < NumInvSlots + NumHotbarSlots)
+	{
+		return HotbarItems[Index - NumInvSlots]; // Return item from hotbar
 	}
 	
 	return FItemStack(); // Return empty if index is not valid
@@ -155,10 +195,10 @@ FItemStack UInventoryComponent::GetItemAtIndex(int32 Index) const
 
 bool UInventoryComponent::IsSlotEmpty(int32 Index) const
 {
-	if (!Items.IsValidIndex(Index)) return true;
+	if (!InvItems.IsValidIndex(Index)) return true;
 	
 	// If item is valid, return not empty
-	return !Items[Index].IsValid();
+	return !InvItems[Index].IsValid();
 }
 
 bool UInventoryComponent::ContainsItem(UItemData* Item, const int32 Quantity) const
@@ -167,7 +207,7 @@ bool UInventoryComponent::ContainsItem(UItemData* Item, const int32 Quantity) co
 	
 	int32 TotalQuantity = 0;
 	
-	for (const FItemStack& Stack : Items)
+	for (const FItemStack& Stack : InvItems)
 	{
 		if (Stack.ItemData == Item)
 		{
