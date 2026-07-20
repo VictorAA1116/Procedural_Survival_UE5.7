@@ -110,7 +110,7 @@ int UInventoryComponent::AddItem(UItemData* Item, int32 Quantity)
 		}
 	}
 	
-	return 0;
+	return NumSuccessfullyAdded;
 }
 
 int UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
@@ -173,9 +173,35 @@ bool UInventoryComponent::AddItemAtIndex(UItemData* Item, int32 Quantity, int32 
 
 bool UInventoryComponent::RemoveItemAtIndex(UItemData* Item, int32 Quantity, int32 Index)
 {
-	if (!Item || Quantity <= 0 || !InvItems.IsValidIndex(Index)) return false;
+	if (!Item || Quantity <= 0) return false;
 	
-	InvItems[Index] = FItemStack();
+	if (InvItems.IsValidIndex(Index))
+	{
+		if (InvItems[Index].Quantity < Quantity) return false;
+		if (InvItems[Index].ItemData != Item) return false;
+		
+		InvItems[Index].Quantity -= Quantity;
+		
+		if (InvItems[Index].Quantity <= 0)
+		{
+			InvItems[Index] = FItemStack();
+		}
+	}
+	else if (Index < NumInvSlots + NumHotbarSlots)
+	{
+		int HotbarIndex = Index - NumInvSlots;
+		
+		if (HotbarItems[HotbarIndex].Quantity < Quantity) return false;
+		if (HotbarItems[HotbarIndex].ItemData != Item) return false;
+		
+		HotbarItems[HotbarIndex].Quantity -= Quantity;
+		
+		if (HotbarItems[HotbarIndex].Quantity <= 0)
+		{
+			HotbarItems[HotbarIndex] = FItemStack();
+		}
+	}
+	
 	return true;
 }
 
