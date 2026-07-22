@@ -15,7 +15,7 @@ class PROCEDURALSURVIVAL_API UFoodItemData : public UItemData
 	GENERATED_BODY()
 	
 public:
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	float HungerRestoration;
 	
 };
