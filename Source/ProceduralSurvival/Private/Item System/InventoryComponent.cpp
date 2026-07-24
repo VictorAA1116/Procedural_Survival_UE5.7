@@ -309,10 +309,11 @@ FItemStack UInventoryComponent::GetItemAtIndex(int32 Index) const
 
 bool UInventoryComponent::IsSlotEmpty(int32 Index) const
 {
-	if (!InvItems.IsValidIndex(Index) || !HotbarItems.IsValidIndex(Index - NumInvSlots)) return true;
+	if (Index >= NumInvSlots && !HotbarItems.IsValidIndex(Index - NumInvSlots)) return true;
+	if (!InvItems.IsValidIndex(Index)) return true;
 	
 	// If item is valid, return not empty
-	return Index >= NumInvSlots ? !InvItems[Index].IsValid() : HotbarItems.IsValidIndex(Index - NumInvSlots);
+	return Index >= NumInvSlots ? !HotbarItems[Index - NumInvSlots].IsValid() : !InvItems[Index].IsValid();
 }
 
 bool UInventoryComponent::ContainsItem(UItemData* Item, const int32 Quantity) const
