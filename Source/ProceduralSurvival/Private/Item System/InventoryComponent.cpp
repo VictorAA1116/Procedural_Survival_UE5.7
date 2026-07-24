@@ -113,6 +113,52 @@ int32 UInventoryComponent::AddItem(UItemData* Item, int32 Quantity)
 	return NumSuccessfullyAdded;
 }
 
+int32 UInventoryComponent::AddItemToHotbar(UItemData* Item, int32 Quantity)
+{
+	if (!Item || Quantity <= 0) return false;
+	
+	int32 NumSuccessfullyAdded = 0;
+	
+	for (FItemStack& Stack : HotbarItems)
+	{
+		if (Stack.ItemData == Item && Stack.Quantity < Item->MaxStackSize)
+		{
+			const int32 SpaceLeft = Item->MaxStackSize - Stack.Quantity;
+			const int32 ToAdd = FMath::Min(SpaceLeft, Quantity);
+			
+			Stack.Quantity += ToAdd;
+			NumSuccessfullyAdded += ToAdd;
+			Quantity -= ToAdd;
+			
+			if (Quantity <= 0)
+			{
+				FOnItemAdded.Broadcast();
+				FOnInventoryChanged.Broadcast();
+				return NumSuccessfullyAdded;
+			}
+		}
+		
+		if (!Stack.IsValid())
+		{
+			int32 ToAdd = FMath::Min(Item->MaxStackSize, Quantity);
+			Stack.ItemData = Item;
+			Stack.Quantity = ToAdd;
+			
+			NumSuccessfullyAdded += ToAdd;
+			Quantity -= ToAdd;
+			
+			if (Quantity <= 0)
+			{
+				FOnItemAdded.Broadcast();
+				FOnInventoryChanged.Broadcast();
+				return NumSuccessfullyAdded;
+			}
+		}
+	}
+	
+	return NumSuccessfullyAdded;
+}
+
 int32 UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
 {
 	if (!Item || Quantity <= 0) return false;

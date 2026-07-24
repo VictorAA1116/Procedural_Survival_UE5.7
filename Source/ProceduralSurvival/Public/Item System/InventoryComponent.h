@@ -38,9 +38,13 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnInventoryChanged FOnInventoryChanged;
 	
-	// Attempts to add an item to the inventory, returns the number of items successfully added.
+	// Attempts to add an item to the inventory, including the hotbar, returns the number of items successfully added.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	int32 AddItem(UItemData* Item, int32 Quantity);
+	
+	// Attempts to add an item to the hotbar, excluding the rest of the inventory, returns the number of items successfully added.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	int32 AddItemToHotbar(UItemData* Item, int32 Quantity);
 	
 	// Attempts to remove an item from the inventory, returns the number of items successfully removed.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
