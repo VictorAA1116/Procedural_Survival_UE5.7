@@ -58,6 +58,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	int32 RemoveItemAtIndex(UItemData* Item, int32 Quantity, int32 Index);
 	
+	// Attempts to remove an item from the hotbar, excluding the rest of the inventory, returns the number of items successfully removed.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	int32 RemoveItemFromHotbar(UItemData* Item, int32 Quantity);
+	
 	// Returns the number of total slots in the inventory, not including the hotbar slots.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	int32 GetNumSlots() const { return NumInvSlots; }

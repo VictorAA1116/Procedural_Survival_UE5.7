@@ -33,7 +33,7 @@ void UInventoryComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 
 int32 UInventoryComponent::AddItem(UItemData* Item, int32 Quantity)
 {
-	if (!Item || Quantity <= 0) return false;
+	if (!Item || Quantity <= 0) return 0;
 	
 	int32 NumSuccessfullyAdded = 0;
 	
@@ -161,11 +161,11 @@ int32 UInventoryComponent::AddItemToHotbar(UItemData* Item, int32 Quantity)
 
 int32 UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
 {
-	if (!Item || Quantity <= 0) return false;
+	if (!Item || Quantity <= 0) return 0;
 	
 	int32 NumSuccessfullyRemoved = 0;
 	
-	for (int32 i = InvItems.Num() - 1; i >= 0; i--)
+	for (int32 i = 0; i < InvItems.Num(); i++)
 	{
 		FItemStack& Stack = InvItems[i];
 		
@@ -175,6 +175,7 @@ int32 UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
 			
 			Stack.Quantity -= ToRemove;
 			Quantity -= ToRemove;
+			NumSuccessfullyRemoved += ToRemove;
 			
 			if (Stack.Quantity <= 0)
 			{
@@ -183,7 +184,6 @@ int32 UInventoryComponent::RemoveItem(UItemData* Item, int32 Quantity)
 				FOnInventoryChanged.Broadcast();
 			}
 			
-			NumSuccessfullyRemoved += ToRemove;
 			if (Quantity <= 0) return NumSuccessfullyRemoved;
 		}
 	}
@@ -263,30 +263,66 @@ int32 UInventoryComponent::RemoveItemAtIndex(UItemData* Item, int32 Quantity, in
 	
 	if (InvItems.IsValidIndex(Index))
 	{
-		if (InvItems[Index].Quantity < Quantity) return 0;
 		if (InvItems[Index].ItemData != Item) return 0;
 		
-		InvItems[Index].Quantity -= Quantity;
-		NumSuccessfullyRemoved += Quantity;
+		int32 ToRemove = FMath::Min(Quantity, InvItems[Index].Quantity);
+		
+		InvItems[Index].Quantity -= ToRemove;
+		NumSuccessfullyRemoved += ToRemove;
 		
 		if (InvItems[Index].Quantity <= 0)
 		{
 			InvItems[Index] = FItemStack();
+			return NumSuccessfullyRemoved;
 		}
 	}
 	else if (Index < NumInvSlots + NumHotbarSlots)
 	{
 		int HotbarIndex = Index - NumInvSlots;
 		
-		if (HotbarItems[HotbarIndex].Quantity < Quantity) return 0;
 		if (HotbarItems[HotbarIndex].ItemData != Item) return 0;
 		
-		HotbarItems[HotbarIndex].Quantity -= Quantity;
-		NumSuccessfullyRemoved += Quantity;
+		int32 ToRemove = FMath::Min(Quantity, HotbarItems[HotbarIndex].Quantity);
+		
+		HotbarItems[HotbarIndex].Quantity -= ToRemove;
+		NumSuccessfullyRemoved += ToRemove;
 		
 		if (HotbarItems[HotbarIndex].Quantity <= 0)
 		{
 			HotbarItems[HotbarIndex] = FItemStack();
+			return NumSuccessfullyRemoved;
+		}
+	}
+	
+	return NumSuccessfullyRemoved;
+}
+
+int32 UInventoryComponent::RemoveItemFromHotbar(UItemData* Item, int32 Quantity)
+{
+	if (!Item || Quantity <= 0) return 0;
+	
+	int32 NumSuccessfullyRemoved = 0;
+	
+	for (int32 i = 0; i < HotbarItems.Num(); i++)
+	{
+		FItemStack& Stack = HotbarItems[i];
+		
+		if (Stack.ItemData == Item)
+		{
+			const int32 ToRemove = FMath::Min(Stack.Quantity, Quantity);
+			
+			Stack.Quantity -= ToRemove;
+			Quantity -= ToRemove;
+			NumSuccessfullyRemoved += ToRemove;
+			
+			if (Stack.Quantity <= 0)
+			{
+				Stack = FItemStack();
+				FOnItemRemoved.Broadcast();
+				FOnInventoryChanged.Broadcast();
+			}
+			
+			if (Quantity <= 0) return NumSuccessfullyRemoved;
 		}
 	}
 	
@@ -323,6 +359,15 @@ bool UInventoryComponent::ContainsItem(UItemData* Item, const int32 Quantity) co
 	int32 TotalQuantity = 0;
 	
 	for (const FItemStack& Stack : InvItems)
+	{
+		if (Stack.ItemData == Item)
+		{
+			TotalQuantity += Stack.Quantity;
+			if (TotalQuantity >= Quantity) return true;
+		}
+	}
+	
+	for (const FItemStack& Stack : HotbarItems)
 	{
 		if (Stack.ItemData == Item)
 		{
